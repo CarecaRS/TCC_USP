@@ -1,6 +1,10 @@
-# TCC em risco de inadimplência
+# Default Risk Project
 
-Desafio Kaggle utilizado como referência: https://www.kaggle.com/competitions/amex-default-prediction
+THIS IS A WORKING PROJECT
+
+The main dataset can be downloaded from https://www.kaggle.com/datasets/wordsforthewise/lending-club/data?select=accepted_2007_to_2018Q4.csv.gz
+
+EFFR available in (link, somewhere in FED websites). 
 
 ## Objetivos
 
