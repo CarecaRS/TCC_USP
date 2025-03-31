@@ -1,50 +1,3 @@
-# A fazer ainda: verificar datas, pegar taxas de juros básicas dos EUA nessas épocas
-#
-# URLs de referência:
-# https://www.kaggle.com/code/faressayah/lending-club-loan-defaulters-prediction
-# https://www.kaggle.com/code/pavlofesenko/minimizing-risks-for-loan-investments
-# https://www.kaggle.com/code/pileatedperch/predicting-charge-off-from-initial-listing-data
-#
-# Banco de dados:
-# https://www.kaggle.com/datasets/wordsforthewise/lending-club/data
-# Refere-se aos empréstimos cedidos pelo Lending Club (EUA), de 2007 até 2018Q4.
-#
-# Informações sobre as features:
-# https://www.kaggle.com/datasets/imsparsh/lending-club-loan-dataset-2007-2011
-# 
-# Informações econômicas:
-# Como taxa de juros de referência será utilizada a Effective Federal Funds Rate:
-# https://www.newyorkfed.org/markets/reference-rates/additional-information-about-reference-rates#effr_obfr_calculation_methodology
-# https://www.newyorkfed.org/markets/reference-rates/effr
-# 
-# Download do CSV: https://fred.stlouisfed.org/series/EFFR
-#
-# https://ycharts.com/indicators/effective_federal_funds_rate#:~:text=Basic%20Info-,Effective%20Federal%20Funds%20Rate%20is%20at%204.33%25%2C%20compared%20to%204.33,long%20term%20average%20of%204.61%25.  (sim, acaba com um ponto mesmo)
-# The Effective Federal Funds Rate is the rate set by the FOMC (Federal Open Market Committee)
-# for banks to borrow funds from each other. The Federal Funds Rate is extremely important because
-# it can act as the benchmark to set other rates. Historically, the Federal Funds Rate reached as
-# high as 22.36% in 1981 during the recession. Additionally, after the financial crisis in 2008-2009,
-# the Federal Funds rate nearly reached zero when quantitative easing was put into effect.
-#
-# FR 2040: https://www.federalreserve.gov/apps/reportingforms/Report/Index/FR_2420
-#
-# https://fred.stlouisfed.org/series/DFEDTARU  # limite superior
-# https://fred.stlouisfed.org/series/DFEDTARL  # limite inferior
-# https://fred.stlouisfed.org/series/DFEDTAR  # target, tem a informação da mudança em 2008
-#
-# Para efeitos de raciocínio, a Effective Federal Funds Rate representa para os Estados Unidos o que a
-# taxa DI (depósito interbancário) representa para o Brasil. Ambas servem como proxy para a taxa de
-# juros básica de suas respectivas nações/economias. Diferente do Brasil, os EUA não possuem uma
-# taxa-alvo (como é comumente conhecida a nossa Selic), eles trabalham com piso e teto de referência
-# desde 2008. Por questões de reproducibilidade, opta-se então por trabalhar com a EFFR tendo em vista
-# essa taxa ser divulgada continuamente desde 1954 até hoje.
-#
-# Explica o que é taxa básica de juros, explica o que é o FED.
-#
-# Em relação aos lags da taxa de juros: eu não consegui encontrar histórico de projeções
-# da taxa básica de juros anterior a 2020, então tentar usar a taxa real futura mais um
-# ruído aleatório de até 0.5pp
-#
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -88,7 +41,7 @@ def separa_datas(df, col):
 
 
 ############
-# DATA WRANGLING
+# DATA WRANGLING: TAXAS DE JUROS
 #=========================
 
 # Tratamento do arquivo com as taxas de juros
@@ -96,12 +49,12 @@ effr = pd.read_csv('./data/EFFR.csv')
 effr['observation_date'] = pd.to_datetime(effr['observation_date'])  # transforma a informação de cronologia de object para datas
 #
 mask_pos = effr['observation_date'] >= '2020-01-01'  # seleciona as datas pós ano de 2019
-mask_pre = effr['observation_date'] <= '2006-12-31'  # seleciona as dadas pré ano de 2017
+mask_pre = effr['observation_date'] <= '2005-12-31'  # seleciona as dadas pré ano de 2006
 dropar = np.array(effr[mask_pos | mask_pre].index)  # filtra os índices referente a essas datas em um array
 effr = effr.drop(dropar).dropna().reset_index(drop=True)  # dropa as datas selecionadas e elimina NaNs (dias como Natal e Ano-Novo, por exemplo), refazendo o índice
 #
 datas = separa_datas(effr, 'observation_date')
-taxas = (effr['EFFR']/100).round(8)  # transforma as taxas de percentual para decimal, isolando em uma serie. Utilizada função round(8) pois alguns elementos estavam sendo calculados com um '1' na décima casa decimal
+taxas = effr['EFFR']  # isola as taxas de juros
 effr = pd.concat([datas, taxas], axis=1)
 #
 # O registro da concessão dos empréstimos contém informação apenas de mês/ano do contrato, não da data em que foi feito. Para utilização
@@ -110,18 +63,41 @@ effr = effr.groupby(['mes_ano'])['EFFR'].mean().reset_index()  # agrega as infor
 effr['mes_ano'] = pd.to_datetime(effr['mes_ano'], format='%b-%Y')  # manipulação de object para data
 effr = effr.sort_values(by='mes_ano').reset_index(drop=True)  # ordena em função da data
 effr['mes_ano'] = separa_datas(effr, 'mes_ano')['mes_ano']  # faz o ajuste de mês e ano novamente
+#
+# O ruído é baseado nos últimos 6 períodos para a expectativa futura de 6 meses e
+# baseado nos últimos 12 períodos para a expectativa futura de 12 meses
+expec_6m = effr['EFFR'].rolling(7).mean().dropna().reset_index(drop=True)
+expec_12m = effr['EFFR'].rolling(13).mean().dropna().reset_index(drop=True)
+#
+# Criação das expectativas futuras das taxas de juros com adição de ruído.
+desvio = 0.5  # meio ponto percentual a.a.
+#
+ruido_6m = []
+for i in range(0,len(expec_6m)):
+    temp = np.random.normal(expec_6m[i], desvio)
+    ruido_6m.append(temp)
+expec_6m = abs(pd.Series(ruido_6m, name='expec6m'))  # utiliza valores em módulo, não existem juros negativos na prática
+#
+ruido_12m = []
+for i in range(0,len(expec_12m)):
+    temp = np.random.normal(expec_12m[i], desvio)
+    ruido_12m.append(temp)
+expec_12m = abs(pd.Series(ruido_12m, name='expec12m'))
+#
+# Une as expectativas de taxas em um único dataframe
+expectativas = pd.concat([expec_6m, expec_12m], axis=1)
+#
+# E une o dataframe original
+effr = pd.concat([effr, expectativas], axis=1)
+#
+# Com as manipulações já feitas, seleciona-se apenas o período compreendido pelo
+# banco de dados contendo as informações dos contratos (2007 a 2018)
+effr = effr.drop(range(0,12)).dropna().reset_index(drop=True)
 
 
-
-
-
-
-effr.shift(6)
-
-expec_6m
-
-expec_12m
-
+############
+# DATA WRANGLING: INFORMAÇÕES DOS CONTRATOS
+#=========================
 
 
 
