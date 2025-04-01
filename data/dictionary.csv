@@ -1,0 +1,153 @@
+Feature,Descrição
+acc_now_delinq,Número de contratos em que o tomador está inadimplente
+acc_open_past_24mths,Número de contratos iniciados nos últimos 24 meses
+addr_state,Estado (unidade federativa) do tomador
+all_util,Saldo em relação ao limite de crédito (todos os contratos)
+annual_inc,Renda anual autoinformada pelo tomador durante o cadastro
+annual_inc_joint,Renda anual conjunta autoinformada pelos co-tomadores
+application_type,Indicador se a solicitação é feita de forma individual ou conjunta
+avg_cur_bal,Saldo médio de todos contratos
+bc_open_to_buy,Limite de crédito rotativo disponível total
+bc_util,Relação entre o saldo total atual e o total do limite de crédito rotativo total
+chargeoff_within_12_mths,Número de operações em prejuízo nos últimos 12 meses
+collection_recovery_fee,Taxas de recuperação de dívidas terceirizadas (collections)
+collections_12_mths_ex_med,Número de dívidas terceirizadas (collections) nos últimos 12 meses. excluindo dívidas médicas
+debt_settlement_flag,Sinalização se o tomador. que já está classificado como prejuízo. está em negociação com alguma empresa terceirizada
+debt_settlement_flag_date,Data da sinalização de o tomador em prejuízo estar em negociação com alguma empresa terceirizada
+deferral_term,Correlação direta (mesmo número de obs pelo menos) com hardship_type. tipo da prorrogação
+delinq_2yrs,Número de ocorrências de atrasos superiores a 30 dias (mas pagos) pelo tomador nos últimos 2 anos
+delinq_amnt,Montante vencido das operações do tomador que encontram-se vencidas
+desc,Descrição do empréstimo por parte do tomador
+disbursement_method,Método pelo qual o tomador recebe o recurso (acho que não interfere em nada)
+dti,Debt to Income. relação dívida-renda. calculado com o total do compromentimento mensal do tomador. excluindo-se hipoteca e o empréstimo solicitado. dividido pela renda mensal informada
+dti_joint,Debt to Income conjunta. somatório dos comprometimentos mensais agregados dividio pela renda mensal combinada
+earliest_cr_line,Mês reportado pelo tomador quando este contratou crédito pela primeira vez
+emp_length,Tempo de emprego em anos Valores possíveis entre 0 e 10. sendo 0 menos de um ano e 10 referente a dez anos ou mais
+emp_title,Cargo informado pelo tomador no momento da solicitação do crédito
+fico_range_high,O limite superior do score FICO do tomador
+fico_range_low,O limite inferor do score FICO do tomador
+funded_amnt,Valor total comprometido com o empréstimo na data
+funded_amnt_inv,Valor total do empréstimo amparado por investidores na data
+grade,Classificação de risco atribuída ao empréstimo
+hardship_amount,Valor do abatimento na hardship
+hardship_dpd,Número de dias vencido depois do início do acordo de hardship
+hardship_end_date,Final do acordo
+hardship_flag,Se o tomador passou/entrou em hardship settlement ou não Imagino que seja um acordo de algum tipo
+hardship_last_payment_amount,Valor do último pagamento do acordo
+hardship_length,Mesmo número de observações de deferral_term e de hardship_type
+hardship_loan_status,Status do acordo de renegociação
+hardship_payoff_balance_amount,O saldo a pagar na data do início do acordo
+hardship_reason,Motivo do acordo Diferentes motivações podem ter maior ou menor impacto no risco de inadimplência
+hardship_start_date,Início do acordo
+hardship_status,Status da renegociação/acordo
+hardship_type,Tipo de acordo/negociação
+home_ownership,Status residencial do tomador
+id,Identificador unitário de cada tomador. nenhum se repete
+il_util,Relação do saldo total atual e o limite de crédito geral
+initial_list_status,Status inicial da colocação do empréstimo – W (whole market) ou F (fractional market)
+inq_fi,Número de solicitações de finanças pessoais
+inq_last_12m,Número de solicitações de crédito nos últimos 12 meses
+inq_last_6mths,Número de solicitações de crédito nos últimos 6 meses (excluindo financiamentos automotivo e imobiliário)
+installment,Valor da parcela mensal do empréstimo. se aprovado
+int_rate,Taxa de juros anual do empréstimo
+issue_d,Mês em que o empréstimo foi concedido
+last_credit_pull_d,Última vez em que o Lending Club fez verificação de crédito (no sentido de score geral. FICO). para este empréstimo
+last_fico_range_high,Limite superior do score FICO na última vez que foi solicitado
+last_fico_range_low,Limite inferior do score FICO na última vez que foi solicitado
+last_pymnt_amnt,Valor total do último pagamento recebido
+last_pymnt_d,Último mês em que um pagamento foi recebido
+loan_amnt,O limite de crédito do empréstimo solicitado pelo tomador Se em algum momento o departamento de crédito reduzir o limite de crédito isso refletirá neste valor
+loan_status,Status do empréstimo no presente momento
+max_bal_bc,Saldo devedor atual máximo em todos os contratos rotativos
+member_id,Somente NaNs
+mo_sin_old_il_acct,Número de meses desde que o primeiro contrato de empréstimo foi contratado
+mo_sin_old_rev_tl_op,Número de meses desde que o primeiro contrato de crédito rotativo foi contratado
+mo_sin_rcnt_rev_tl_op,Número de meses desde o último contrato de crédito rotativo foi realizado
+mo_sin_rcnt_tl,Número de meses desde o último contrato foi realizado
+mort_acc,Número de hipotecas
+mths_since_last_delinq,Quantidade de meses desde a última inadimplência do tomador
+mths_since_last_major_derog,Quantidade de meses desde o último registro de inadimplência de 90 dias ou pior (derogatory rating)
+mths_since_last_record,Número de meses desde o útlimo registro público (?)
+mths_since_rcnt_il,Meses deste que o contrato mais recente foi aberto
+mths_since_recent_bc,Número de meses desde a última conta de cartão de crédito
+mths_since_recent_bc_dlq,Número de meses desde a última conta de cartão de crédito ficou inadimplida
+mths_since_recent_inq,Meses desde a última solicitação (most recent inquiry)
+mths_since_recent_revol_delinq,Meses desde a última inadimplência em crédito rotativo
+next_pymnt_d,Cronograma para o próximo pagamento (inútil de repente)
+num_accts_ever_120_pd,Número de contratos que já ficaram com mais de 120 dias de atraso
+num_actv_bc_tl,Número de contas de cartão de crédito ativas
+num_actv_rev_tl,Número de contas de crédito rotativo ativas
+num_bc_sats,Número de contas de cartão de crédito satisfatórias (?)
+num_bc_tl,Número de contas de cartão de crédito
+num_il_tl,Número de contas de empréstimo
+num_op_rev_tl,Número de contas de crédito rotativo ativas
+num_rev_accts,Número de contas de crédito rotativo
+num_rev_tl_bal_gt_0,Número de contas de crédito rotativo com saldo maior que zero
+num_sats,Número de contas satisfatórias (?)
+num_tl_120dpd_2m,Número de contas com atraso de 120 dias (atualizado nos últimos 2 meses)
+num_tl_30dpd,Número de contas com atraso de 30 dias (atualizado nos últimos 2 meses)
+num_tl_90g_dpd_24m,Número de contas com 90+ dias de atraso nos últimos 24 meses
+num_tl_op_past_12m,Número de contas/contratos abertas(os) nos últimos 12 meses
+open_acc,Números de contratos (ou linhas de crédito?) ativos no registro do tomador
+open_acc_6m,Número de contratos abertos nos últimos 6 meses
+open_act_il,Número de contratos ativos no momento
+open_il_12m,Número de contratos abertos nos últimos 12 meses
+open_il_24m,Número de contratos abertos nos últimos 24 meses
+open_il_6m,Number of currently active installment trades
+open_rv_12m,Número de contratos rotativos nos últimos 12 meses
+open_rv_24m,Número de contratos rotativos nos últimos 24 meses
+orig_projected_additional_accrued_interest,O valor original de juros adicionais projetados que serão acumulados para o plano de pagamento Esse campo vai ser nulo se o tomador quebrar o contrato
+out_prncp,Saldo remanescente do principal relativo ao total financiado
+out_prncp_inv,Saldo remanescente do principal relativo ao total financiado por investidores
+payment_plan_start_date,Data em que o primeiro pagamento do principal da renegociação é devido.
+pct_tl_nvr_dlq,Percentual das operações que nunca atrasaram
+percent_bc_gt_75,Percentual de todos os cartões com utilização acima de 75% do limite
+policy_code,Indicador de disponibilidade pública (policy_code = 1). dropar
+pub_rec,Número de anotações públicas negativas (Serasa/SPC)
+pub_rec_bankruptcies,Número de falências registradas publicamente
+purpose,Destinação do crédito informada pelo tomador no momento da solicitação
+pymnt_plan,Indicador de se um plano de pagamento para o empréstimo foi fornecido antecipadamente (plano de negócios para o empréstimo?)
+recoveries,Recuperação bruta de créditos em prejuízo
+revol_bal,Total de crédito rotativo (recorrente. tipo cartão de crédito que usa. paga. tem disponível novamente)
+revol_bal_joint,Total de crédito rotativo conjunto (das composições de renda e etc)
+revol_util,Percentual de uso do crédito rotativo
+sec_app_chargeoff_within_12_mths,Número de operações do segundo proponente em prejuízo nos últimos 12 meses
+sec_app_collections_12_mths_ex_med,Número de dívidas terceirizadas (collections) nos últimos 12 meses. excluindo dívidas médicas
+sec_app_earliest_cr_line,Mês reportado pelo segundo proponente quando este contratou crédito pela primeira vez
+sec_app_fico_range_high,Limite superior do score FICO do segundo proponente
+sec_app_fico_range_low,Limite inferior do score FICO do segundo proponente
+sec_app_mort_acc,Número de hipotecas do segundo proponente
+sec_app_mths_since_last_major_derog,Quantidade de meses desde o último registro de inadimplência de 90 dias ou pior (derogatory rating) do segundo proponente
+sec_app_num_rev_accts,Número de contas de crédito rotativo do segundo proponente
+sec_app_open_acc,Números de contratos abertos do segundo proponente na data de aplicação
+sec_app_open_act_il,Número de contratos do segundo proponente ativos no momento
+sec_app_revol_util,Percentual de uso do crédito rotativo do segundo proponente
+sec_app_inq_last_6mths,Número de solicitações de crédito nos últimos 6 meses do segundo proponente
+settlement_amount,Valor do acordo. já com eventual desconto (se existente)
+settlement_date,Data do acordo de recuperação
+settlement_percentage,Percentual do saldo devedor original. que foi negociado O valor do desconto então é valor original * (100-settlement_percentage)
+settlement_status,Status da negociação de recuperação (aqui não sei se é da galera em prejuízo ou só em atraso)
+settlement_term,Prazo (em meses) do acordo de recuperação
+sub_grade,Subclassificação de risco atribuída ao crédito
+tax_liens,Quantidade de tax liens (algo tipo recuperação judicial de IPTU)
+term,Prazo do crédito. pode ser ou 36 meses ou 60 meses
+title,Nome do empréstimo. fornecido pelo tomador
+tot_coll_amt,Somatório de todas as dívidas terceirizadas durante todo o tempo
+tot_cur_bal,Saldo total de todos os contratos
+tot_hi_cred_lim,Limite de crédito total
+total_acc,Número total de linhas de crédito atualmente no registro do cliente
+total_bal_ex_mort,Saldo total em crédito. excluindo hipotecas
+total_bal_il,Saldo total corrente de todos os contratos parcelados
+total_bc_limit,Limite total nos cartões de crédito
+total_cu_tl,Número total de contratos de crédito
+total_il_high_credit_limit,Limite total de crédito parcelado
+total_pymnt,Pagamentos recebidos até a data relativos ao total tomado
+total_pymnt_inv,Pagamentos recebidos até a data relativos ao total tomado financiado por investidores
+total_rec_int,Recebimentos relativos aos juros até a data
+total_rec_late_fee,Taxas em função de atraso recebidas até a data
+total_rec_prncp,Recebimentos relativos ao principal até a data
+total_rev_hi_lim  ,Total de limite de crédito de crédito rotativo
+url,URL do empréstimo Os acessos com IP do Brasil são negados
+verification_status,Indicador se a renda informada tem comprovante (verified). se o Lending Club confirmou com o empregador (source verified) ou se a renda não possui comprovação alguma
+verification_status_joint,Indicador se a renda conjunta informada tem comprovante (verified). se o Lending Club confirmou com os empregadores (source verified) ou se a renda não possui comprovação alguma
+zip_code,Os primeiros 3 dígitos do CEP (zip code) do tomador
