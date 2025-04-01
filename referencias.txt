@@ -1,0 +1,43 @@
+Addo, P.M.; Guegan, D.; Hassani, B. 2018. Credit risk analysis using machine and deep learning models. Working Papers 2018(08). Department of Economics, University of Venice "Ca' Foscari". Disponível em: <https://ideas.repec.org/p/ven/wpaper/201808.html>. Acesso em: 27 fev. 2025.
+
+Altman, E.I. 1968. Financial ratios, discriminant analysis and the prediction of corporate bankruptcy. The Journal of Finance 23(4): 589-734. Disponível em: <https://onlinelibrary.wiley.com/doi/epdf/10.1111/j.1540-6261.1968.tb00843.x>. Acesso em: 26 fev. 2025.
+
+Barboza, F.; Kimura, H.; Altman, E.I. 2017. Machine learning models and bankruptcy prediction. Expert Systems with Applications (83). Disponível em: <https://www.sciencedirect.com/science/article/pii/S0957417417302415>. Acesso em: 24 fev. 2025.
+
+Bayraci, X.; Susuz, C. 2019. A deep neural network (DNN) based classification model in application to loan deafult prediction. Theoretical and Applied Economics 26(4): 75-84. Disponível em: <https://www.ebsco.ectap.ro/Theoretical_&_Applied_Economics_2019_Winter.pdf#page=75>. Acesso em: 24 fev. 2025.
+
+Beaver, W.H. 1966. Financial ratios as predictors of failure. Journal of Accounting Research 4: 71-111. Disponível em: <https://www.jstor.org/stable/2490171>. Acesso em: 28 fev. 2025.
+
+Dastile, X.; Celik, T.; Potsane, M. 2020. Statistical and machine learning models in credit scoring: A systematic literature survey. Applied Soft Computing Journal 91. Disponível em: <https://www.sciencedirect.com/science/article/pii/S1568494620302039?via%3Dihub>. Acesso em: 27 fev. 2025.
+
+Georgiou, K; Yannacopoulos, A.N. 2024. Deep neural networks for probability of default modelling. Journal of Industrial and Management Optimization 20(12). Disponível em: <https://www.researchgate.net/publication/379054682_DEEP_NEURAL_NETWORKS_FOR_PROBABILITY_OF_DEFAULT_MODELLING>. Acesso em: 26 fev. 2025.
+
+He, H.; Fan, Y. 2021. A novel hybrid ensemble model based on tree-based method and deep learning method for default prediction. Expert Systems with Applications 176. Disponível em: <https://www.sciencedirect.com/science/article/pii/S0957417421003407>. Acesso em: 24 fev. 2025.
+
+International Financial Reporting Standards [IFRS]. 2022. IFRS 9 - Financial Instruments. Disponível em: <https://www.ifrs.org/content/dam/ifrs/publications/pdf-standards/english/2022/issued/part-a/ifrs-9-financial-instruments.pdf?bypass=on>. Acesso em: 26 fev. 2025.
+
+Jiang, Z.; Su, J.; Zhou, L. 2023. Credit default prediction based on genetic algorithm improved neural network. In: 9th International Conference on Systems and Informatics (ICSAI) 2023. Anais... Disponível em: <https://ieeexplore.ieee.org/abstract/document/10423366>. Acesso em: 24 fev. 2025.
+
+Kellner, R.; Nagl, M.; Rosch, D. 2022. Opening the black box - quantile neural networks for loss given default prediction. Journal of Banking & Finance (134). Disponível em: <https://www.sciencedirect.com/science/article/pii/S0378426621002855>. Acesso em: 24 fev. 2025.
+
+Khashman, A. 2010. Neural networks for credit risk evaluation: investigation of different neural models and learning schemes. Expert Systems with Applications 37(9). Disponível em: <https://www.sciencedirect.com/science/article/pii/S0957417410001405>. Acesso em: 27 fev. 2025.
+
+Kvamme, H.; Sellereite, N.; Aas, K.; Sjursen, S. Predicting mortgage default using convolutional neural networks. Expert Systems with Applications 102: 207-217. Disponível em: <https://www.sciencedirect.com/science/article/pii/S0957417418301179>. Acesso em: 28 fev. 2025.
+
+Liu, J.; Zhang, S.; Fan, H. 2022. A two-stage hybrid credit risk prediction model based on XGBoost and graph-based deep neural network. Expert sySystems with Applications (195). Disponível em: <https://www.sciencedirect.com/science/article/pii/S0957417422001142>. Acesso em: 25 fev. 2025.
+
+Mai, F.; Tian, S.; Lee, C.; Ma, L. 2019. Deep learning models for bankrupcy prediction using textual disclosures. European Journal of Operational Research 274(2): 743-758. Disponível em: <https://www.sciencedirect.com/science/article/pii/S0377221718308774>. Acesso em: 28 fev. 2025.
+
+Myers, J.H.; Forgy, E.W. 1963. The development of numerical credit evaluation systems. Journal of the American Statistical Association 58(303): 799-806. Disponível em: <https://pages.ucsd.edu/~aronatas/project/academic/Comparison%20of%20Discriminant%20and%20Regression%20analysis%20for%20cred.pdf>. Acesso em: 28 fev. 2025.
+
+Ribeiro, B.; Lopes, N. 2011. Deep belief networks for financial prediction. In: Neural Information Processing (ICONIP) 2011. Anais... p.766-773. Disponível em: <https://link.springer.com/chapter/10.1007/978-3-642-24965-5_86>. Acesso em: 26 fev. 2025.
+
+Shen, F.; Zhao, X; Kou, G; Alsaadi, F.E. 2021. A new deep learning ensemble credit risk evaluation model with an improved synthetic minority oversampling technique. Applied Soft Computing Journal 98. Disponível em: <https://www.sciencedirect.com/science/article/pii/S1568494620307900>. Acesso em: 27 fev. 2025.
+
+Wu, D.; Ma, X.; Olson, D. 2022. Financial distress prediction using integrated z-score and multilaye perceptron neural networks. Decision Support Systems (159). Disponível em: <https://www.sciencedirect.com/science/article/pii/S0167923622000859>. Acesso em: 24 fev. 2025.
+
+Xu, X. 2016. Estimating lifetime expected credit losses under IFRS 9. Disponível em: <https://papers.ssrn.com/sol3/papers.cfm?abstract_id=2758513>. Acesso em: 26 fev. 2025.
+
+Yan, Z.; Qu, H.; Chen, C.; Lv, X.; Zuo, E.; Wang, K.; Cai, X. 2025. WIGNN: An adaptive graph-structured reasoning model for credit default prediction. Engineering Applications of Artificial Intelligence 139(B). Disponível em: <https://www.sciencedirect.com/science/article/pii/S095219762401755X>. Acesso em: 25 fev. 2025.
+
+Zeidan, R.; Boechat, C.; Fleury, A. 2015. Developing a sustainability credit score system. Journal of Business Ethics 127: 283-196. Disponível em: <https://link.springer.com/article/10.1007/s10551-013-2034-2>. Acesso em: 26 fev. 2025.
