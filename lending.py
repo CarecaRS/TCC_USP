@@ -42,6 +42,7 @@ def separa_datas(df, col):
 # Função para buscar a explicação de cada feature no dicionário
 def significado(x: object):
     dic = pd.read_csv('./data/dictionary.csv', index_col=False)
+    print(f'Feature: {x}')
     return print(f'Explicação: {dic[dic['Feature'] == x]['Descrição'].values}')
 
 
@@ -104,10 +105,6 @@ effr = effr.drop(range(0,12)).dropna().reset_index(drop=True)
 # DATA WRANGLING: INFORMAÇÕES DOS CONTRATOS
 #=========================
 
-# Carrega um dataframe contendo a explicação de cada feature, caso necessário
-dicionario = pd.read_csv('./data/dictionary.csv', index_col=False)
-
-
 # Leitura do arquivo com as informações dos contratos
 emprestimos = pd.read_csv('./data/loans2020.csv', low_memory=False) # hiperparâmetro 'low_memory' aqui apenas para não retornar aviso no console
 
@@ -149,28 +146,16 @@ len(emprestimos.isnull().sum()[emprestimos.isnull().sum()/emprestimos.shape[0] >
 # Dada a alteração na quantidade de variáveis entre 37 e 40% de NaNs, opta-se por eliminar o menor número possível
 # entre essas duas, logo, as features com quantidade de NaNs equivalente a 40% ou mais das observações serão eliminadas
 feature_drop = emprestimos.isnull().sum()[emprestimos.isnull().sum()/emprestimos.shape[0] > 0.3].index.values
-#emprestimos = emprestimos.drop(feature_drop, axis=1)
 
-dicionario = pd.read_csv('./data/dictionary.csv', index_col=False)
-
-emprestimos[emprestimos['desc'].isnull() == False]['desc']  # são anotações diversas no contrato. NaNs substituídos por 'none'
-
-feature_drop
-
-dicionario.columns
-
-## Tem descrições que estão retornando vazias. Verificar.
+# Verificação do que se tratam essas features com altos índices de NaNs:
 for col in feature_drop:
-    print(f'\nFeature {col}. Significado:')
-    print(f'{dicionario[dicionario['Feature'] == col]['Descrição'].values}')
-
-emprestimos['sec_app_inq_last_6mths'].isnull().sum()
-
-dicionario.loc['Feature', feature_drop[0]]
+    print(significado(col))
 
 
+significado(feature_drop[0])
 
-significado('sec_app_inq_last_6mths')
+len(feature_drop)
+
 
 # Verificação das dimensões do dataset limpo
 print(f'Número de observações (linhas): {emprestimos.shape[0]}')  # 2260701
