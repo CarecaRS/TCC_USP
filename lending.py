@@ -24,7 +24,6 @@ np.set_printoptions(suppress=True, precision=6)
 # FUNÇÕES
 #=========================
 
-
 # Função para manipulação das datas do arquivo com as taxas de juros do FED
 def separa_datas(df, col):
     # Manipulação das informações
@@ -40,6 +39,12 @@ def separa_datas(df, col):
     return pd.DataFrame(novo_df)  # retorna um novo dataframe
 
 
+# Função para buscar a explicação de cada feature no dicionário
+def significado(x: object):
+    dic = pd.read_csv('./data/dictionary.csv', index_col=False)
+    return print(f'Explicação: {dic[dic['Feature'] == x]['Descrição'].values}')
+
+
 ############
 # DATA WRANGLING: TAXAS DE JUROS
 #=========================
@@ -48,7 +53,7 @@ def separa_datas(df, col):
 effr = pd.read_csv('./data/EFFR.csv')
 effr['observation_date'] = pd.to_datetime(effr['observation_date'])  # transforma a informação de cronologia de object para datas
 #
-mask_pos = effr['observation_date'] >= '2020-01-01'  # seleciona as datas pós ano de 2019
+mask_pos = effr['observation_date'] >= '2021-04-01'  # seleciona as datas pós 2020Q1
 mask_pre = effr['observation_date'] <= '2005-12-31'  # seleciona as dadas pré ano de 2006
 dropar = np.array(effr[mask_pos | mask_pre].index)  # filtra os índices referente a essas datas em um array
 effr = effr.drop(dropar).dropna().reset_index(drop=True)  # dropa as datas selecionadas e elimina NaNs (dias como Natal e Ano-Novo, por exemplo), refazendo o índice
@@ -66,15 +71,15 @@ effr['mes_ano'] = separa_datas(effr, 'mes_ano')['mes_ano']  # faz o ajuste de m�
 #
 # O ruído é baseado nos últimos 6 períodos para a expectativa futura de 6 meses e
 # baseado nos últimos 12 períodos para a expectativa futura de 12 meses
-expec_6m = effr['EFFR'].rolling(7).mean().dropna().reset_index(drop=True)
-expec_12m = effr['EFFR'].rolling(13).mean().dropna().reset_index(drop=True)
+expec_6m = effr['EFFR'].rolling(7).mean().dropna().reset_index(drop=True)  # desloca as observações 6 períodos à frente
+expec_12m = effr['EFFR'].rolling(13).mean().dropna().reset_index(drop=True)  # desloca 12 períodos
 #
 # Criação das expectativas futuras das taxas de juros com adição de ruído.
 desvio = 0.5  # meio ponto percentual a.a.
 #
 ruido_6m = []
 for i in range(0,len(expec_6m)):
-    temp = np.random.normal(expec_6m[i], desvio)
+    temp = np.random.normal(expec_6m[i], desvio)  # gera um ruído aleatório ao redor da taxa real utilizando o desvio estabelecido
     ruido_6m.append(temp)
 expec_6m = abs(pd.Series(ruido_6m, name='expec6m'))  # utiliza valores em módulo, não existem juros negativos na prática
 #
@@ -99,11 +104,13 @@ effr = effr.drop(range(0,12)).dropna().reset_index(drop=True)
 # DATA WRANGLING: INFORMAÇÕES DOS CONTRATOS
 #=========================
 
-
+# Carrega um dataframe contendo a explicação de cada feature, caso necessário
+dicionario = pd.read_csv('./data/dictionary.csv', index_col=False)
 
 
 # Leitura do arquivo com as informações dos contratos
-emprestimos = pd.read_csv('./data/loans.csv', low_memory=False) # hiperparâmetro 'low_memory' aqui apenas para não retornar aviso no console
+emprestimos = pd.read_csv('./data/loans2020.csv', low_memory=False) # hiperparâmetro 'low_memory' aqui apenas para não retornar aviso no console
+
 
 # Verificação das dimensões do dataset
 print(f'Número de observações (linhas): {emprestimos.shape[0]}')  # 2260701
@@ -132,78 +139,38 @@ emprestimos['loan_status'].value_counts()
 #=========================
 
 # Verificando as features com maiores % de valores NaN:
-# 38 features com NaNs acima de 90% do total de observações;
-# 44 acima de 50% das observações;
-# 46 acima de 40% das observações;
-# 58 acima de 37% das observações.
-len(emprestimos.isnull().sum()[emprestimos.isnull().sum()/emprestimos.shape[0] > 0.37])
+# 29 features com NaNs acima de 90% do total de observações;
+# 35 acima de 50% das observações;
+# 35 acima de 40% das observações;
+# 37 acima de 30% das observações;
+# 49 acima de 29% das observações.
+len(emprestimos.isnull().sum()[emprestimos.isnull().sum()/emprestimos.shape[0] > 0.3])
 
 # Dada a alteração na quantidade de variáveis entre 37 e 40% de NaNs, opta-se por eliminar o menor número possível
 # entre essas duas, logo, as features com quantidade de NaNs equivalente a 40% ou mais das observações serão eliminadas
-feature_drop = emprestimos.isnull().sum()[emprestimos.isnull().sum()/emprestimos.shape[0] > 0.4].index.values
+feature_drop = emprestimos.isnull().sum()[emprestimos.isnull().sum()/emprestimos.shape[0] > 0.3].index.values
 #emprestimos = emprestimos.drop(feature_drop, axis=1)
 
-# Contudo, algumas NaN podem ser preenchidas por alguma estrutura lógica. Assim, cada uma das features
-# constantes em 'feature_drop' serão analisadas individualmente
-
-# member_id
-# desc
-mths_since_last_delinq
-mths_since_last_record
-next_pymnt_d
-mths_since_last_major_derog
-annual_inc_joint
-dti_joint
-verification_status_joint
-mths_since_rcnt_il
-il_util
-mths_since_recent_bc_dlq
-mths_since_recent_revolv_delinq
-revol_bal_joint
-sec_app_fico_range_low
-sec_app_fico_range_high
-sec_app_earliest_cr_line
-sec_app_revol_util
-sec_app_open_act_il
-sec_app_num_rev_accts
-sec_app_chargeoff_within_12_mths
-sec_app_collections_12_mths_ex_med
-sec_app_mths_since_last_major_derog
-hardship_type
-hardship_reason
-hardship_status
-deferral_term
-hardship_amount
-hardship_start_date
-hardship_end_date
-payment_plan_start_date
-hardship_length_
-hardship_dpd
-hardship_loan_status
-orig_projected_additional_accrued_interest
-hardship_payoff_balance_amount
-hardship_last_payment_ammount
-debt_settlement_flag_date
-settlement_status
-settlement_date
-settlement_amount
-settlement_percentage
-settlement_term
-
-
-
+dicionario = pd.read_csv('./data/dictionary.csv', index_col=False)
 
 emprestimos[emprestimos['desc'].isnull() == False]['desc']  # são anotações diversas no contrato. NaNs substituídos por 'none'
 
 feature_drop
 
+dicionario.columns
+
+## Tem descrições que estão retornando vazias. Verificar.
+for col in feature_drop:
+    print(f'\nFeature {col}. Significado:')
+    print(f'{dicionario[dicionario['Feature'] == col]['Descrição'].values}')
+
+emprestimos['sec_app_inq_last_6mths'].isnull().sum()
+
+dicionario.loc['Feature', feature_drop[0]]
 
 
 
-
-
-
-
+significado('sec_app_inq_last_6mths')
 
 # Verificação das dimensões do dataset limpo
 print(f'Número de observações (linhas): {emprestimos.shape[0]}')  # 2260701
