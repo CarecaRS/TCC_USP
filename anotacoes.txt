@@ -1,13 +1,14 @@
-A fazer ainda: verificar datas, pegar taxas de juros básicas dos EUA nessas épocas
-
 URLs de referência:
 https://www.kaggle.com/code/faressayah/lending-club-loan-defaulters-prediction
 https://www.kaggle.com/code/pavlofesenko/minimizing-risks-for-loan-investments
 https://www.kaggle.com/code/pileatedperch/predicting-charge-off-from-initial-listing-data
 
 Banco de dados:
-https://www.kaggle.com/datasets/wordsforthewise/lending-club/data
-Refere-se aos empréstimos cedidos pelo Lending Club (EUA), de 2007 até 2018Q4.
+#1- https://www.kaggle.com/datasets/wordsforthewise/lending-club/data
+#Refere-se aos empréstimos cedidos pelo Lending Club (EUA), de 2007 até 2018Q4.
+
+**2- https://www.kaggle.com/datasets/ethon0426/lending-club-20072020q1/data**
+Refere-se aos empréstimos cedidos pelo Lending Club (EUA), de 2007 até 2020Q1. Tem ao redor de 700mil observações adicionais, ao custo de 9 features a menos.
 
 Informações sobre as features:
 https://www.kaggle.com/datasets/imsparsh/lending-club-loan-dataset-2007-2011
@@ -42,7 +43,26 @@ essa taxa ser divulgada continuamente desde 1954 até hoje.
 Explica o que é taxa básica de juros, explica o que é o FED.
 
 Em relação aos lags da taxa de juros: eu não consegui encontrar histórico de projeções
-da taxa básica de juros anterior a 2020, então tentar usar a taxa real futura mais um
+da taxa básica de juros anterior a 2020, então será usada a taxa real futura mais um
 ruído aleatório de até 0.5pp
-#
-só criando o arquivo.
+
+A feature 'home_ownership' possui classes 'ANY' e 'OTHER', além dos enquadramentos certos. De repente juntar essas duas pode ser algo útil.
+A feature 'loan_status' tem duas categorizações específicas que pode-se testar unindo elas às categorias gerais e também dropar.
+A feature 'desc' tem alguns registros de consolidação de dívida, de repente vale a pena confrontar isso com a 'purpose'.
+'mths_since_last_delinq' é o tempo em meses desde o último atraso, se o cliente nunca atrasou é NaN mesmo. Substitui por 1000, tipo assim? Ou também dá para criar uma feature nova como 'nunca_atrasou'.
+'pub_rec' é quantidade de anotações tipo 'Serasa'. NaNs substitui por zero.
+'last_pymnt_d' é o último mês que um pagamento foi recebido. Se ainda não tiver outra variável sobre isso, pode ser feito binning com o prazo entre útlimo pagamento e análise
+'last_pymnt_amnt' refere ao último valor recebido como pagamento, de repente dá para engenhar algo
+'last_credit_pull_d' trata do tempo em que foi feita a última consulta ao credit score do cliente no contrato em questão. De repente tem a ver, de repente não.
+'mths_since_last_major_derog' deve ter NaNs incorretos também, pois se o tomador não teve anotações então o registro é NaN.
+'policy_code' pode dropar que é tudo igual
+Devo ter pulado alguns, mas 'hardship_type' preenche com 'None'
+'hardship_start_date' e end_date pode ter alguma relação, para prazos maiores a exposição ao risco aumenta, aumentando a probabilidade de inadimplência.
+
+De repente dá para fazer duas análises de inadimplência. Uma com os clientes regulares e outra com os clientes que fizeram acordo de renegociação (hardship settlement)
+
+
+INTRODUÇÃO: O que é o risco de inadimplência, como se pode estimar, de repente alguma pincelada em crises econômicas recentes (deixa a nível mundial eu acho, ou separa Brasil x Resto do Mundo, pensando nas publicações internas/gringas), métodos normalmente utilizados para esse cálculo. O que são redes neurais, conceito de deep learning. Explicar matriz de confusão e a importância dela nessas análises.
+
+Faz os N modelos que tem que fazer, na apresentação de resultados faz uma tabela com as métricas dos resultados obtidos, constando por óbvio a métrica-base de análise mas também os percentuais de erro tipo 1 e tipo 2 de cada algoritmo. Tem como fazer um modelo ensamble que utilize os 'não-erros tipo 1' e os 'não-erros tipo 2' para conceder o crédito será?
+
