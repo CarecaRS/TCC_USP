@@ -1,4 +1,3 @@
-# ATENÇÃO! Tem vários 'hardship_reason' que são iguais mas escritos diferentes. Verificar.
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -40,13 +39,7 @@ def separa_datas(df, col):
     return pd.DataFrame(novo_df)  # retorna um novo dataframe
 
 
-# Função para buscar a explicação de cada feature no dicionário
-def significado(x: object):
-    dic = pd.read_csv('./data/dictionary.csv', index_col=False)
-    print(f'Feature: {str(x).upper()}')
-    print(f'Explicação: {dic[dic['Feature'] == str(x)]['Descrição'].values}')
-
-
+# Função para buscar a explicação de cada feature no dicionário e analisar NaNs
 def analise(lista, dataframe: pd.DataFrame):
     """
     :param lista: lista de features a se verificar
@@ -54,6 +47,10 @@ def analise(lista, dataframe: pd.DataFrame):
     :param dataframe: o banco de dados que contem todas as features que serão verificadas
     :type dataframe: DataFrame
     """
+    def significado(x: object):
+        dic = pd.read_csv('./data/dictionary.csv', index_col=False)
+        print(f'Feature: {str(x).upper()}')
+        print(f'Explicação: {dic[dic['Feature'] == str(x)]['Descrição'].values}')
     if len(lista) > 1:
         for i in range(0, len(lista)):
             print('\n')
@@ -131,7 +128,6 @@ effr = effr.drop(range(0,12)).dropna().reset_index(drop=True)
 # Leitura do arquivo com as informações dos contratos
 emprestimos = pd.read_csv('./data/loans2020.csv', low_memory=False) # hiperparâmetro 'low_memory' aqui apenas para não retornar aviso no console
 
-
 # Verificação das dimensões do dataset
 print(f'Número de observações (linhas): {emprestimos.shape[0]}')  # 2260701
 print(f'Número de features (colunas): {emprestimos.shape[1]}')  # 151
@@ -144,7 +140,7 @@ print(f'Número de features (colunas): {emprestimos.shape[1]}')  # 151
 # - In Grace Period: empréstimos atrasados mas que ainda podem ser pagos sem ônus, neste estudo considera-se este enquadramento
 #                    como período entre 1-15 dias de atraso, dadas as demais características do banco de dados
 # - Late (16-30 days): empréstimos em atraso
-# - Does not meet the credit policy (ambos): descartado, pois não atendem a política de crédito
+# - Does not meet the credit policy (ambos): descartados?, pois não atendem a política de crédito
 # - Default: empréstimos atrasados a mais de 120 dias mas ainda não enquadrados em prejuízo
 emprestimos['loan_status'].value_counts()
 
@@ -172,7 +168,6 @@ feature_drop = emprestimos.isnull().sum()[emprestimos.isnull().sum()/emprestimos
 
 # Análise individual de cada uma dessas features
 analise(feature_drop, emprestimos)
-
 
 # Seleção das features de renegociação (15 variáveis no total)
 hard_cols = []
@@ -221,22 +216,21 @@ mask = hardships['hardship_loan_status'].isnull() == False
 hardships['fez_hardship'] = 0
 hardships.loc[mask, 'fez_hardship'] = 1
 
-
 # Verificação de NaNs dentro destes que fizeram hardship
 hardships.loc[mask].isnull().sum()[hardships.loc[mask].isnull().sum() > 0]
 
 # hardship_flag preenchendo com a moda ('N')
 #hardships.loc[mask][hardships.loc[mask, 'hardship_flag'].isnull()].T
 hardships.loc[mask, 'hardship_flag'] = hardships.loc[mask, 'hardship_flag'].fillna('N')
-
+#!
 # hardship_status preenchendo com 'ACTIVE'
 #hardships.loc[mask][hardships.loc[mask, 'hardship_status'].isnull()].T
 hardships.loc[mask, 'hardship_status'] = hardships.loc[mask, 'hardship_status'].fillna('ACTIVE')
-
+#!
 # hardship_reason preenchendo com 'Unknown', não foi percebido padrão
 #hardships.loc[mask][hardships.loc[mask, 'hardship_reason'].isnull()]
 hardships.loc[mask, 'hardship_reason'] = hardships.loc[mask, 'hardship_reason'].fillna('UNKNOWN')
-
+#!
 # orig_projected_additional_accrued_interest preenchido com zero, em função de 'hardship_type'
 #hardships.loc[mask][hardships.loc[mask, 'orig_projected_additional_accrued_interest'].isnull()]
 hardships.loc[mask, 'orig_projected_additional_accrued_interest'] = hardships.loc[mask, 'orig_projected_additional_accrued_interest'].fillna(0)
@@ -277,11 +271,10 @@ hardships.loc[mask, 'hardship_reason'] = 'EXCESSIVE_OBLIGATIONS'
 #!
 mask = hardships['hardship_reason'] == 'DEATH'  # Agregando 'death' em 'family_death', deduz-se que o falecido não vai pedir renegociação do próprio contrato
 hardships.loc[mask, 'hardship_reason'] = 'FAMILY_DEATH'
-
+#!
 # Trabalhar com uppercase é desconfortável, ajustando:
 for i in range(0, len(lista)):
     hardships[lista[i]] = hardships[lista[i]].str.lower()
-
 
 
 ############
@@ -290,7 +283,64 @@ for i in range(0, len(lista)):
 joint_ap = pd.read_parquet('data/joint_ap.parquet')
 sep_ap = joint_ap.columns.to_list()
 
+# Criação de indicador de contrato com composição de renda
+mask = joint_ap['annual_inc_joint'].isnull()
+joint_ap['contrato_conjunto'] = 0
+joint_ap.loc[~mask, 'contrato_conjunto'] = 1
 
+# Verificação dos dtypes 'object' primeiro:
+lista = joint_ap.dtypes[joint_ap.dtypes == 'object'].index.to_list()
+
+# As observações de 'verification_status_joint' com NaN que foram
+# identificadas como contrato conjunto terão fillna('Not Verified')
+mask = joint_ap[lista[1]].isnull()
+
+
+
+#######################   REFAZERRRRRRRRRRRR    ######################################
+joint_ap.loc[mask, 'verification_status_joint'][joint_ap.loc[mask, 'contrato_conjunto'] == 1] = joint_ap.loc[mask, 'verification_status_joint'][joint_ap.loc[mask, 'contrato_conjunto'] == 1].fillna('Not Verified')  # ficou uma massaroca mas funciona NÃO DEU CERTO ESSA BAGAÇA AQUI, TEM QUE REFAZER
+######################################################################################
+
+
+
+# O resto dessa feature terá fillna('Not Applicable')
+joint_ap[lista[0]] = joint_ap[lista[0]].fillna('Not Applicable')
+
+
+
+mask = joint_ap['contrato_conjunto'] == 1
+
+joint_ap.loc[mask, lista[0]].value_counts()
+
+
+joint_ap[lista[0]]
+
+#A outra feature categórica,
+
+joint_ap.loc[mask, lista[1]][joint_ap.loc[mask, 'contrato_conjunto'] == 1]
+
+
+
+
+lista
+joint_ap[lista[1]].isnull().sum()
+
+
+
+
+
+
+joint_ap['sec_app_revol_util'].value_counts()
+
+analise(sep_ap, joint_ap)
+
+
+# verification_status_joint fillna 
+for obs in lista:
+    print('\n')
+    print(joint_ap[obs].isnull().sum())
+
+joint_ap[lista]
 
 
 
