@@ -42,8 +42,16 @@ def separa_datas(df, col):
 # Função para buscar a explicação de cada feature no dicionário
 def significado(x: object):
     dic = pd.read_csv('./data/dictionary.csv', index_col=False)
-    print(f'Feature: {x}')
-    return print(f'Explicação: {dic[dic['Feature'] == x]['Descrição'].values}')
+    print(f'Feature: {x.upper()}')
+    print(f'Explicação: {dic[dic['Feature'] == x]['Descrição'].values}')
+
+
+# Função para a análise individual de cada feature -- depende de 'feature_drop'
+def analise(x: int):
+    significado(feature_drop[x])
+    print(f'Quantidade total de NaNs: {emprestimos[feature_drop[x]].isnull().sum()}')
+    print(f'Proporção desses NaNs: {round((emprestimos[feature_drop[x]].isnull().sum()/len(emprestimos))*100, 2)}%')
+
 
 
 ############
@@ -151,10 +159,55 @@ feature_drop = emprestimos.isnull().sum()[emprestimos.isnull().sum()/emprestimos
 for col in feature_drop:
     print(significado(col))
 
+# Análise individual de cada uma dessas features
+for i in range(0, len(feature_drop)):
+    print(f'Feature número: {i+1}/{len(feature_drop)}')
+    analise(i)
+    print('\n')
 
-significado(feature_drop[0])
+# Feature mths_since_last_delinq: meses desde a última inadimplência. Se nunca foi inadimplente, esse campo
+# certamente será NaN. Imputado 999. De repente incluir uma nova feature tipo 'já inadimpliu?', e esses NaNs
+# colocar tudo como 'não' lá.
+emprestimos[feature_drop[0]] = emprestimos[feature_drop[0]].fillna(999)
 
-len(feature_drop)
+# Feature mths_since_last_record: semelhante à acima
+emprestimos[feature_drop[1]] = emprestimos[feature_drop[1]].fillna(999)
+
+# Feature next_pymnt_d: pode dropar
+emprestimos[emprestimos[feature_drop[2]].isnull() == False][[feature_drop[2], 'issue_d', 'loan_status']]
+
+# Feature mths_since_last_major_derog: semelhante à primeira analisada
+emprestimos[feature_drop[3]] = emprestimos[feature_drop[3]].fillna(999)
+
+# Feature annual_inc_joint: deixa igual à renda individual será?
+# Feature dti_joint mesmo raciocínio, deixa igual à dti
+# Feature verification_status_joint pode fazer uma categoria nova como 'None' ou 'No Applicable'
+# mths_since_rcnt_il pega a data do último contrato, subtrai da data atual
+# il_util pega o saldo total e pega o limite de crédito, divide um pelo outro
+# mths_since_recent_bc_dlq similar à primeira feature, de repente tem que pensar algo diferente nessas coisas
+# mths_since_recent_revol_delinq mesmo raciocínio
+# revol_bal_joint aqui tem que ver o que se esses NaNs são de contas individuais. Se sim, puxa o valor da conta individual. Bom criar uma coluna categórica de 'conjunto ou não'
+# sec_app_XYZ (11 features) se não tem segundo proponente, aqui vai ser NaN sempre
+# hardship_type pode incluir 'None' aqui, por exemplo. De repente nova feature hardship sim/não
+# hardship_reason aqui tem que olhar de perto, faz um binning e OHE
+# harsthip_status quase idêntico ao type. Se não tem hardship, não tem acordo.
+# deferral_term mesma coisa, esse deve ser o prazo do acordo de renegociação
+# hardship_amount se não tem acordo, aqui vai zer NaN mesmo. Preenche com zeros.
+# hardship_start_date se não tem hardship, não tem início.
+# hardship_end_date mesma coisa
+# payment_plan_start_date data devida do primeiro pagamento
+# hardship_length prazo do acordo
+# hardship_dpd fez contrato de renegociação e atrasou por X dias
+# hardship_loan_status esse aqui deve determinar todos os outros hardships, dar uma olhada com carinho.
+# orig_projected_additional_accrued_interest se não tem renegociação, esse campo é zerado. Preenche com zero.
+# hardship_payoff_balance_amount saldo inicial do acordo hardship. se não tem acordo, aqui vai ser NaN mesmo (ou zero)
+# hardship_last_payment_amount se não fez acordo, isso não tem nem como existir.
+
+
+
+
+
+
 
 
 # Verificação das dimensões do dataset limpo
