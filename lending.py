@@ -1,3 +1,4 @@
+# ATENÇÃO! Tem vários 'hardship_reason' que são iguais mas escritos diferentes. Verificar.
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -32,7 +33,7 @@ def separa_datas(df, col):
     #
     for i in range(0, df.shape[0]):  # preenche as listas
         dias.append(df.loc[i, col].strftime('%d'))
-        mes_ano.append(df.loc[i, col].strftime('%b-%Y'))
+        mes_ano.append(df.loc[i, col].strftime('%b-%Y').lower())
     #
     novo_df = {'dia':dias, 'mes_ano':mes_ano}  # cria um dict com as informações
     #
@@ -42,15 +43,29 @@ def separa_datas(df, col):
 # Função para buscar a explicação de cada feature no dicionário
 def significado(x: object):
     dic = pd.read_csv('./data/dictionary.csv', index_col=False)
-    print(f'Feature: {x.upper()}')
-    print(f'Explicação: {dic[dic['Feature'] == x]['Descrição'].values}')
+    print(f'Feature: {str(x).upper()}')
+    print(f'Explicação: {dic[dic['Feature'] == str(x)]['Descrição'].values}')
 
 
-# Função para a análise individual de cada feature -- depende de 'feature_drop'
-def analise(x: int):
-    significado(feature_drop[x])
-    print(f'Quantidade total de NaNs: {emprestimos[feature_drop[x]].isnull().sum()}')
-    print(f'Proporção desses NaNs: {round((emprestimos[feature_drop[x]].isnull().sum()/len(emprestimos))*100, 2)}%')
+def analise(lista, dataframe: pd.DataFrame):
+    """
+    :param lista: lista de features a se verificar
+    :dtype lista: list
+    :param dataframe: o banco de dados que contem todas as features que serão verificadas
+    :type dataframe: DataFrame
+    """
+    if len(lista) > 1:
+        for i in range(0, len(lista)):
+            print('\n')
+            print(f'Feature #{i+1}/{len(lista)}')
+            significado(lista[i])
+            print(f'Quantidade total de NaNs: {dataframe[lista[i]].isnull().sum()}')
+            print(f'Proporção desses NaNs: {round((dataframe[lista[i]].isnull().sum()/len(dataframe))*100, 2)}%')
+    elif len(lista) == 1:
+        print('\n')
+        significado(lista[0])
+        print(f'Quantidade total de NaNs: {dataframe[lista[0]].isnull().sum()}')
+        print(f'Proporção desses NaNs: {round((dataframe[lista[0]].isnull().sum()/len(dataframe))*100, 2)}%')
 
 
 
@@ -155,56 +170,125 @@ len(emprestimos.isnull().sum()[emprestimos.isnull().sum()/emprestimos.shape[0] >
 # entre essas duas, logo, as features com quantidade de NaNs equivalente a 40% ou mais das observações serão eliminadas
 feature_drop = emprestimos.isnull().sum()[emprestimos.isnull().sum()/emprestimos.shape[0] > 0.3].index.values
 
-# Verificação do que se tratam essas features com altos índices de NaNs:
-for col in feature_drop:
-    print(significado(col))
-
 # Análise individual de cada uma dessas features
-for i in range(0, len(feature_drop)):
-    print(f'Feature número: {i+1}/{len(feature_drop)}')
-    analise(i)
-    print('\n')
-
-# Feature mths_since_last_delinq: meses desde a última inadimplência. Se nunca foi inadimplente, esse campo
-# certamente será NaN. Imputado 999. De repente incluir uma nova feature tipo 'já inadimpliu?', e esses NaNs
-# colocar tudo como 'não' lá.
-emprestimos[feature_drop[0]] = emprestimos[feature_drop[0]].fillna(999)
-
-# Feature mths_since_last_record: semelhante à acima
-emprestimos[feature_drop[1]] = emprestimos[feature_drop[1]].fillna(999)
-
-# Feature next_pymnt_d: pode dropar
-emprestimos[emprestimos[feature_drop[2]].isnull() == False][[feature_drop[2], 'issue_d', 'loan_status']]
-
-# Feature mths_since_last_major_derog: semelhante à primeira analisada
-emprestimos[feature_drop[3]] = emprestimos[feature_drop[3]].fillna(999)
-
-# Feature annual_inc_joint: deixa igual à renda individual será?
-# Feature dti_joint mesmo raciocínio, deixa igual à dti
-# Feature verification_status_joint pode fazer uma categoria nova como 'None' ou 'No Applicable'
-# mths_since_rcnt_il pega a data do último contrato, subtrai da data atual
-# il_util pega o saldo total e pega o limite de crédito, divide um pelo outro
-# mths_since_recent_bc_dlq similar à primeira feature, de repente tem que pensar algo diferente nessas coisas
-# mths_since_recent_revol_delinq mesmo raciocínio
-# revol_bal_joint aqui tem que ver o que se esses NaNs são de contas individuais. Se sim, puxa o valor da conta individual. Bom criar uma coluna categórica de 'conjunto ou não'
-# sec_app_XYZ (11 features) se não tem segundo proponente, aqui vai ser NaN sempre
-# hardship_type pode incluir 'None' aqui, por exemplo. De repente nova feature hardship sim/não
-# hardship_reason aqui tem que olhar de perto, faz um binning e OHE
-# harsthip_status quase idêntico ao type. Se não tem hardship, não tem acordo.
-# deferral_term mesma coisa, esse deve ser o prazo do acordo de renegociação
-# hardship_amount se não tem acordo, aqui vai zer NaN mesmo. Preenche com zeros.
-# hardship_start_date se não tem hardship, não tem início.
-# hardship_end_date mesma coisa
-# payment_plan_start_date data devida do primeiro pagamento
-# hardship_length prazo do acordo
-# hardship_dpd fez contrato de renegociação e atrasou por X dias
-# hardship_loan_status esse aqui deve determinar todos os outros hardships, dar uma olhada com carinho.
-# orig_projected_additional_accrued_interest se não tem renegociação, esse campo é zerado. Preenche com zero.
-# hardship_payoff_balance_amount saldo inicial do acordo hardship. se não tem acordo, aqui vai ser NaN mesmo (ou zero)
-# hardship_last_payment_amount se não fez acordo, isso não tem nem como existir.
+analise(feature_drop, emprestimos)
 
 
+# Seleção das features de renegociação (15 variáveis no total)
+hard_cols = []
+hard_cols.append(feature_drop[34])  # essas três features não possuem 'hardship' no nome, então são
+hard_cols.append(feature_drop[30])  # inseridas manualmente
+hard_cols.append(feature_drop[26])
+for hardship in emprestimos.columns.to_list():
+    if "hardship" in hardship:
+        hard_cols.append(hardship)
+ 
 
+# Seleção das features de aplicação conjunta (15 variáveis)
+sep_ap = []
+for other_applicant in emprestimos.columns.to_list():
+    if "sec_app_" in other_applicant:
+        sep_ap.append(other_applicant)
+    if "joint" in other_applicant:
+        sep_ap.append(other_applicant)
+
+
+# Segregando features de aplicação conjunta e de renegociação
+joint_ap = emprestimos[sep_ap].copy()
+emprestimos.drop(sep_ap, axis=1, inplace=True)
+
+hardships = emprestimos[hard_cols].copy()
+emprestimos.drop(hard_cols, axis=1, inplace=True)
+
+# Salva as informações de forma individual em Parquet (mais rápido, menos espaço)
+#hardships.to_parquet('data/hardships.parquet')
+#joint_ap.to_parquet('data/joint_ap.parquet')
+
+############
+# DATA WRANGLING: TRATAMENTO DOS CONTRATOS COM RENEGOCIAÇÃO
+#=========================
+hardships = pd.read_parquet('data/hardships.parquet')
+hard_cols = hardships.columns.to_list()
+
+# Relembrando cada uma das features
+analise(hard_cols, hardships)
+
+# Parte-se do princípio que quem não tenha status definido de hardship
+# é em função de não ter realizado acordo algum
+mask = hardships['hardship_loan_status'].isnull() == False
+
+# Criando feature nova identificando quais contratos tem renegociação
+hardships['fez_hardship'] = 0
+hardships.loc[mask, 'fez_hardship'] = 1
+
+
+# Verificação de NaNs dentro destes que fizeram hardship
+hardships.loc[mask].isnull().sum()[hardships.loc[mask].isnull().sum() > 0]
+
+# hardship_flag preenchendo com a moda ('N')
+#hardships.loc[mask][hardships.loc[mask, 'hardship_flag'].isnull()].T
+hardships.loc[mask, 'hardship_flag'] = hardships.loc[mask, 'hardship_flag'].fillna('N')
+
+# hardship_status preenchendo com 'ACTIVE'
+#hardships.loc[mask][hardships.loc[mask, 'hardship_status'].isnull()].T
+hardships.loc[mask, 'hardship_status'] = hardships.loc[mask, 'hardship_status'].fillna('ACTIVE')
+
+# hardship_reason preenchendo com 'Unknown', não foi percebido padrão
+#hardships.loc[mask][hardships.loc[mask, 'hardship_reason'].isnull()]
+hardships.loc[mask, 'hardship_reason'] = hardships.loc[mask, 'hardship_reason'].fillna('UNKNOWN')
+
+# orig_projected_additional_accrued_interest preenchido com zero, em função de 'hardship_type'
+#hardships.loc[mask][hardships.loc[mask, 'orig_projected_additional_accrued_interest'].isnull()]
+hardships.loc[mask, 'orig_projected_additional_accrued_interest'] = hardships.loc[mask, 'orig_projected_additional_accrued_interest'].fillna(0)
+
+
+# Todas as features com dtypes numéricos terão fillna(0)
+# As variáveis numéricas (desconsiderando 'fez_hardship')
+lista = hardships.dtypes[hardships.dtypes == 'float64'].index.to_list()
+hardships[lista] = hardships[lista].fillna(0)
+
+
+# Todas as features com dtypes categóricos terão fillna específico
+lista = hardships.dtypes[hardships.dtypes == 'object'].index.to_list()
+hardships['hardship_flag'] = hardships['hardship_flag'].fillna('N')  # não tem motivo por ter sido flaggado
+hardships[lista] = hardships[lista].fillna('Not Applicable')
+
+
+# A feature hardship_reason tem classes repetidas, com grafia diferente.
+# De repente pode ser unido DISABILITY com MEDICAL também.
+# Ajuste abaixo.
+mask = hardships['hardship_reason'] == 'INCOMECURT'
+hardships.loc[mask, 'hardship_reason'] = 'INCOME_CURTAILMENT'
+#!
+mask = hardships['hardship_reason'] == 'UNEMPLOYED'
+hardships.loc[mask, 'hardship_reason'] = 'UNEMPLOYMENT'
+#!
+mask = hardships['hardship_reason'] == 'REDCDHOURS'
+hardships.loc[mask, 'hardship_reason'] = 'REDUCED_HOURS'
+#!
+mask = hardships['hardship_reason'] == 'NATDISAST'
+hardships.loc[mask, 'hardship_reason'] = 'NATURAL_DISASTER'
+#!
+mask = hardships['hardship_reason'] == 'EXCESSOBLI'
+hardships.loc[mask, 'hardship_reason'] = 'EXCESSIVE_OBLIGATIONS'
+#!
+mask = hardships['hardship_reason'] == 'FINANCIAL'  # Agregando 'financial' em 'excessive_obligations' pois, via de regra, tem a mesma causa
+hardships.loc[mask, 'hardship_reason'] = 'EXCESSIVE_OBLIGATIONS'
+#!
+mask = hardships['hardship_reason'] == 'DEATH'  # Agregando 'death' em 'family_death', deduz-se que o falecido não vai pedir renegociação do próprio contrato
+hardships.loc[mask, 'hardship_reason'] = 'FAMILY_DEATH'
+
+# Trabalhar com uppercase é desconfortável, ajustando:
+for i in range(0, len(lista)):
+    hardships[lista[i]] = hardships[lista[i]].str.lower()
+
+
+
+############
+# DATA WRANGLING: TRATAMENTO DOS CONTRATOS COM APLICAÇÃO CONJUNTA
+#=========================
+joint_ap = pd.read_parquet('data/joint_ap.parquet')
+sep_ap = joint_ap.columns.to_list()
 
 
 
@@ -217,18 +301,3 @@ print(f'Número de features (colunas): {emprestimos.shape[1]}')  # 105
 
 float_cols = emprestimos.dtypes[emprestimos.dtypes == 'float64'].index.values  # 81
 obj_cols = emprestimos.dtypes[emprestimos.dtypes == 'object'].index.values  # 24
-
-emprestimos[obj_cols]
-
-emprestimos[float_cols]
-
-
-for col in emprestimos[feature_drop].columns:
-    print(f'\nFeature {col}:')
-    print(emprestimos[col].value_counts())
-
-emprestimos[emprestimos['desc'].isnull() == False]['desc']
-
-emprestimos[feature_drop].value_counts()
-
-
