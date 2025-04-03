@@ -168,7 +168,8 @@ emprestimos['loan_status'].value_counts()
 # 35 acima de 40% das observações;
 # 37 acima de 30% das observações;
 # 49 acima de 29% das observações.
-len(emprestimos.isnull().sum()[emprestimos.isnull().sum()/emprestimos.shape[0] > 0.3])
+# Para verificação:
+# len(emprestimos.isnull().sum()[emprestimos.isnull().sum()/emprestimos.shape[0] > 0.3])
 
 # Dada a alteração na quantidade de variáveis entre 37 e 40% de NaNs, opta-se por eliminar o menor número possível
 # entre essas duas, logo, as features com quantidade de NaNs equivalente a 40% ou mais das observações serão eliminadas
@@ -348,30 +349,28 @@ joint_ap.loc[indices, lista[1]] = valores
 indices = joint_ap[joint_ap[lista[2]].isnull()][lista[2]].index.to_list()
 valores = emprestimos.iloc[indices]['revol_bal'].values
 joint_ap.loc[indices, lista[2]] = valores
-
+#!
 # sec_app_revol_util assume o valor de revol_util
 indices = joint_ap[joint_ap[lista[8]].isnull()][lista[8]].index.to_list()
 valores = emprestimos.iloc[indices]['revol_util'].values  # existem NaNs no dataset original, depois se lida com isso
 joint_ap.loc[indices, lista[8]] = valores
+#!
+indices = joint_ap[joint_ap[lista[8]].isnull()][lista[8]].index.to_list() # refazendo índice, ainda ficam 53 NaNs
+lista = joint_ap.isnull().sum()[joint_ap.isnull().sum() > 53].index.to_list()
 
-indices = joint_ap[joint_ap[lista[8]].isnull()][lista[8]].index.to_list() # refazendo índice, ainda ficam 65 NaNs
+
+# As fico ranges copia-se do mutuário principal, uma vez que é impossível estimar. Pode-se partir da
+# premissa que muito embora o segundo mutuário não seja idêntico ao primeiro eles devem possuir
+# hábitos e comportamentos semelhantes na maioria das vezes.
+
+# 
+
+joint_ap[lista]
 
 
-emprestimos['total_rev_hi_lim'].isnull().sum()/len(emprestimos)
-emprestimos
+joint_ap.loc[indices]
 
-emprestimos.iloc[indices].columns.to_list()
-
-#emprestmios
-thiago = ['revol_bal', 'revol_util', 'total_rev_hi_lim', 'bc_open_to_buy']
-
-lista[8]
-
-emprestimos.loc[indices, thiago].to_csv('data/thiago.csv')
-
-emprestimos['total_bc_lim']
-joint_ap['total_bc_lim']
-emprestimos['total_bc_lim']
+emprestimos.iloc[idx].to_csv('data/thiago.csv')
 
 indices2 = []
 for i in range(0, len(indices)):
@@ -400,3 +399,13 @@ print(f'Número de features (colunas): {emprestimos.shape[1]}')  # 105
 
 float_cols = emprestimos.dtypes[emprestimos.dtypes == 'float64'].index.values  # 81
 obj_cols = emprestimos.dtypes[emprestimos.dtypes == 'object'].index.values  # 24
+
+
+# Grafico das correlações no df completo
+temp = emprestimos.dtypes[emprestimos.dtypes == 'float64'].index.to_list()
+correl = emprestimos[temp].corr()
+sns.heatmap(correl,
+            annot = False,
+            cmap = 'Oranges')
+plt.show()
+
