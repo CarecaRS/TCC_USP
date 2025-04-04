@@ -213,10 +213,10 @@ emprestimos.drop(hard_cols, axis=1, inplace=True)
 #=========================
 hardships = pd.read_parquet('data/hardships.parquet')
 hard_cols = hardships.columns.to_list()
-
+#!
 # Relembrando cada uma das features
 analise(hard_cols, hardships)
-
+#!
 # Parte-se do princípio que quem não tenha status definido de hardship
 # é em função de não ter realizado acordo algum
 mask = hardships['hardship_loan_status'].isnull() == False
@@ -284,8 +284,8 @@ hardships.loc[mask, 'hardship_reason'] = 'FAMILY_DEATH'
 # Trabalhar com uppercase é desconfortável, ajustando:
 for i in range(0, len(lista)):
     hardships[lista[i]] = hardships[lista[i]].str.lower()
-
-
+#!
+#!
 ############
 # DATA WRANGLING: TRATAMENTO DOS CONTRATOS COM APLICAÇÃO CONJUNTA
 #=========================
@@ -335,11 +335,7 @@ mask = joint_ap['contrato_conjunto'] == 1
 #!
 # Explicação das features que necessitam ajuste
 analise(lista, joint_ap)
-
-# sec_app_fico_range_low(high) temos problemas... ver como faz para estimar depois. de repente tem um last_fico_range_low/high do 2o proponente
-# todas as outras, zeradas pq faz sentido
-
-
+#!
 # NaNs na feature dti_joint assumem o valor de dti
 indices = joint_ap[joint_ap[lista[1]].isnull()][lista[1]].index.to_list()
 valores = emprestimos.iloc[indices]['dti'].values
@@ -357,27 +353,24 @@ joint_ap.loc[indices, lista[8]] = valores
 #!
 indices = joint_ap[joint_ap[lista[8]].isnull()][lista[8]].index.to_list() # refazendo índice, ainda ficam 53 NaNs
 lista = joint_ap.isnull().sum()[joint_ap.isnull().sum() > 53].index.to_list()
-
-
+#!
 # As fico ranges copia-se do mutuário principal, uma vez que é impossível estimar. Pode-se partir da
 # premissa que muito embora o segundo mutuário não seja idêntico ao primeiro eles devem possuir
-# hábitos e comportamentos semelhantes na maioria das vezes.
+# hábitos e comportamentos semelhantes na grande maioria das vezes.
+#!
+idx_conj = joint_ap[joint_ap['contrato_conjunto'] == 1].index.to_list()  # armazena os índices de todos contratos conjuntos
+vazios = joint_ap.loc[idx_conj][joint_ap.loc[idx_conj, lista[0]].isnull()].index.to_list()  # filtra apenas os vazios em sec_app_fico_range_low
+joint_ap.loc[vazios, lista[0]] = emprestimos.loc[vazios, 'fico_range_low']  # registra o score do primeiro proponente também no segundo
+#!
+idx_conj = joint_ap[joint_ap['contrato_conjunto'] == 1].index.to_list()  # armazena os índices de todos contratos conjuntos
+vazios = joint_ap.loc[idx_conj][joint_ap.loc[idx_conj, lista[1]].isnull()].index.to_list()  # filtra apenas os vazios em sec_app_fico_range_high
+joint_ap.loc[vazios, lista[1]] = emprestimos.loc[vazios, 'fico_range_high']  # registra o score do primeiro proponente também no segundo
+#!
+# As demais features (com exceção de sec_app_revol_util) são variáveis discretas sobre consultas a cadastro,
+# quantidade de recuperações de dívidas, hipotecas, etc., do segundo proponente. NaNs preenchidos com zero:
+zeros = joint_ap.isnull().sum()[joint_ap.isnull().sum() > 53].index.to_list()
+joint_ap[zeros] = joint_ap[zeros].fillna(0)
 
-# 
-
-joint_ap[lista]
-
-
-joint_ap.loc[indices]
-
-emprestimos.iloc[idx].to_csv('data/thiago.csv')
-
-indices2 = []
-for i in range(0, len(indices)):
-    indices2.append(indices[i]+300)
-emprestimos.loc[indices2, thiago].to_csv('data/thiago2.csv')
-
-indices2
 
 
 
