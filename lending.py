@@ -2,12 +2,12 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
+#from datetime import datetime
 pd.set_option('display.max_rows', 250)
 pd.set_option('display.max_columns', None)
 np.set_printoptions(suppress=True, precision=6)
 %autoindent OFF 
 
-#from datetime import datetime
 #from sklearn.metrics import r2_score, log_loss
 #from sklearn.experimental import enable_iterative_imputer
 #from sklearn.impute import IterativeImputer
@@ -24,7 +24,9 @@ np.set_printoptions(suppress=True, precision=6)
 # FUNÇÕES
 #=========================
 
-# Função para manipulação das datas do arquivo com as taxas de juros do FED
+# Função para manipulação das datas
+"""
+#LEGACY
 def separa_datas(df, col):
     # Manipulação das informações
     dias = []  # cria lista vazia para ser preenchida com a informação dos dias
@@ -37,10 +39,29 @@ def separa_datas(df, col):
     novo_df = {'dia':dias, 'mes_ano':mes_ano}  # cria um dict com as informações
     #
     return pd.DataFrame(novo_df)  # retorna um novo dataframe
+"""
+def separa_datas(df, col):
+    temp = pd.DataFrame()
+    print('\nResgatando informações do dataframe...')
+    temp[col] = pd.to_datetime(df[col], format='%b-%Y')
+    dias = []  # cria lista vazia para ser preenchida com a informação dos dias
+    mes_ano = []  # cria lista vazia para ser preenchida com mês/ano
+    if temp[col].isnull().sum() > 0:
+        print(f'\nATENÇÃO! Identificadas NaNs na feature {col}, impossível continuar.')
+        print(f'Favor resolver as {temp[col].isnull().sum()} NaNs antes de tentar novamente. Seu bosta.')
+    else:
+        #
+        print('\nSeparando parâmetros de data e gerando nova série, só um instante por favor.')
+        for i in range(0, len(temp)):  # preenche a lista com mês e ano
+            mes_ano.append(temp.loc[i, col].strftime('%b-%Y').lower())
+        #
+        print('\nGerando nova série ajustada.')
+        #
+        return pd.Series(data=mes_ano, name=col)  # retorna uma série nova
 
 
 # Função para buscar a explicação de cada feature no dicionário e analisar NaNs
-def analise(lista, dataframe: pd.DataFrame):
+def analise_geral(lista, dataframe: pd.DataFrame):
     """
     :param lista: lista de features a se verificar
     :dtype lista: list
@@ -49,21 +70,62 @@ def analise(lista, dataframe: pd.DataFrame):
     """
     def significado(x: object):
         dic = pd.read_csv('./data/dictionary.csv', index_col=False)
-        print(f'Feature: {str(x).upper()}')
-        print(f'Explicação: {dic[dic['Feature'] == str(x)]['Descrição'].values}')
+        print(f'Nome: {str(x).upper()}')
+        print(f'Definição: {dic[dic['Feature'] == str(x)]['Descrição'].values}')
     if len(lista) > 1:
         for i in range(0, len(lista)):
             print('\n')
             print(f'Feature #{i+1}/{len(lista)}')
             significado(lista[i])
+            print(f'Tipo de dado: {str(dataframe[lista[i]].dtypes).upper()}')
             print(f'Quantidade total de NaNs: {dataframe[lista[i]].isnull().sum()}')
             print(f'Proporção desses NaNs: {round((dataframe[lista[i]].isnull().sum()/len(dataframe))*100, 2)}%')
     elif len(lista) == 1:
         print('\n')
         significado(lista[0])
+        print(f'Tipo de dado: {str(dataframe[lista[i]].dtypes).upper()}')
         print(f'Quantidade total de NaNs: {dataframe[lista[0]].isnull().sum()}')
         print(f'Proporção desses NaNs: {round((dataframe[lista[0]].isnull().sum()/len(dataframe))*100, 2)}%')
 
+
+# Função que analisa apenas as features sem NaNs
+def analise_nans(lista, dataframe: pd.DataFrame):
+    """
+    :param lista: lista de features a se verificar
+    :dtype lista: list
+    :param dataframe: o banco de dados que contem todas as features que serão verificadas
+    :type dataframe: DataFrame
+    """
+    def significado(x: object):
+        dic = pd.read_csv('./data/dictionary.csv', index_col=False)
+        print(f'Nome: {str(x).upper()}')
+        print(f'Definição: {dic[dic['Feature'] == str(x)]['Descrição'].values}')
+    if len(lista) > 1:
+        print('\n')
+        print('Calculando tamanho da solicitação... Só um instante por favor.')
+        tam = len(dataframe[lista].isnull().sum()[dataframe[lista].isnull().sum() > 0])
+        idx = 1
+        for i in range(0, len(lista)):
+            if dataframe[lista[i]].isnull().sum() == 0:
+                pass
+            else:
+                print('\n')
+                print(f'Feature #{idx}/{tam}')
+                significado(lista[i])
+                print(f'Tipo de dado: {str(dataframe[lista[i]].dtypes).upper()}')
+                print(f'Quantidade total de NaNs: {dataframe[lista[i]].isnull().sum()}')
+                print(f'Proporção desses NaNs: {round((dataframe[lista[i]].isnull().sum()/len(dataframe))*100, 2)}%')
+                idx += 1
+    elif len(lista) == 1:
+        if dataframe[lista[0]].isnull().sum() == 0:
+            print('\n')
+            print('Sem NaNs nessa lista.')
+        else:
+            print('\n')
+            significado(lista[0])
+            print(f'Tipo de dado: {str(dataframe[lista[0]].dtypes).upper()}')
+            print(f'Quantidade total de NaNs: {dataframe[lista[0]].isnull().sum()}')
+            print(f'Proporção desses NaNs: {round((dataframe[lista[0]].isnull().sum()/len(dataframe))*100, 2)}%')
 
 
 ############
@@ -74,7 +136,7 @@ def analise(lista, dataframe: pd.DataFrame):
 effr = pd.read_csv('./data/EFFR.csv')
 effr['observation_date'] = pd.to_datetime(effr['observation_date'])  # transforma a informação de cronologia de object para datas
 #!
-mask_pos = effr['observation_date'] >= '2021-04-01'  # seleciona as datas pós 2020Q1
+mask_pos = effr['observation_date'] >= '2021-09-01'  # seleciona as datas até 2021Q3
 mask_pre = effr['observation_date'] <= '2005-12-31'  # seleciona as dadas pré ano de 2006
 dropar = np.array(effr[mask_pos | mask_pre].index)  # filtra os índices referente a essas datas em um array
 effr = effr.drop(dropar).dropna().reset_index(drop=True)  # dropa as datas selecionadas e elimina NaNs (dias como Natal e Ano-Novo, por exemplo), refazendo o índice
@@ -88,7 +150,7 @@ effr = pd.concat([datas, taxas], axis=1)
 effr = effr.groupby(['mes_ano'])['EFFR'].mean().reset_index()  # agrega as informações por mês, informando a média
 effr['mes_ano'] = pd.to_datetime(effr['mes_ano'], format='%b-%Y')  # manipulação de object para data
 effr = effr.sort_values(by='mes_ano').reset_index(drop=True)  # ordena em função da data
-effr['mes_ano'] = separa_datas(effr, 'mes_ano')['mes_ano']  # faz o ajuste de mês e ano novamente
+effr['mes_ano'] = separa_datas(effr, 'mes_ano')  # faz o ajuste de mês e ano novamente
 #!
 # O ruído é baseado nos últimos 6 períodos para a expectativa futura de 6 meses e
 # baseado nos últimos 12 períodos para a expectativa futura de 12 meses
@@ -176,7 +238,7 @@ emprestimos['loan_status'].value_counts()
 feature_drop = emprestimos.isnull().sum()[emprestimos.isnull().sum()/emprestimos.shape[0] > 0.3].index.values
 
 # Análise individual de cada uma dessas features
-analise(feature_drop, emprestimos)
+analise_geral(feature_drop, emprestimos)
 
 # Seleção das features de renegociação (15 variáveis no total)
 hard_cols = []
@@ -215,7 +277,7 @@ hardships = pd.read_parquet('data/hardships.parquet')
 hard_cols = hardships.columns.to_list()
 #!
 # Relembrando cada uma das features
-analise(hard_cols, hardships)
+analise_geral(hard_cols, hardships)
 #!
 # Parte-se do princípio que quem não tenha status definido de hardship
 # é em função de não ter realizado acordo algum
@@ -334,7 +396,7 @@ joint_ap[mask] = joint_ap[mask].fillna(0)
 mask = joint_ap['contrato_conjunto'] == 1
 #!
 # Explicação das features que necessitam ajuste
-analise(lista, joint_ap)
+analise_geral(lista, joint_ap)
 #!
 # NaNs na feature dti_joint assumem o valor de dti
 indices = joint_ap[joint_ap[lista[1]].isnull()][lista[1]].index.to_list()
@@ -372,14 +434,302 @@ zeros = joint_ap.isnull().sum()[joint_ap.isnull().sum() > 53].index.to_list()
 joint_ap[zeros] = joint_ap[zeros].fillna(0)
 
 
+############
+# DATA WRANGLING: TRATAMENTO DAS DEMAIS FEATURES
+#=========================
+emprestimos = pd.read_parquet('data/emprestimos_dropado.parquet')
+dropar = ['Unnamed: 0', 'url', 'zip_code']  # features sem utilização no contexto deste estudo
+emprestimos.drop(dropar, axis=1, inplace=True)
+#acima = emprestimos.isnull().sum()[emprestimos.isnull().sum()/emprestimos.shape[0] > 0.3].index.to_list()
+# Uma observação completamente NaN, dropando abaixo e já refazendo o index
+nulo = emprestimos['home_ownership'].isnull()
+nulo = emprestimos.loc[nulo].index.values
+emprestimos.drop(nulo, inplace=True)
+emprestimos.reset_index(drop=True, inplace=True)
+#!
+# 'tax_liens' se preenche com zeros, como não tem como estimar essa informação então
+# parte-se do princípio que o tomador não tenha essa recuperação judicial
+emprestimos['tax_liens'] = emprestimos['tax_liens'].fillna(0)
+#!
+# As observações em 'next_pymnt_d' são todas ou liquidadas ou transferidas para prejuízo
+mask = emprestimos['next_pymnt_d'].isnull()
+#emprestimos.loc[mask, 'loan_status'].value_counts()  # caso seja necessária a verificação
+#!
+# Criação dos índices dos contratos e substituição dos NaNs
+pagos = emprestimos.loc[mask, 'loan_status'][emprestimos.loc[mask, 'loan_status'] == 'Fully Paid'].index.values
+pagos = emprestimos.iloc[pagos]['next_pymnt_d'].fillna('fully_paid')
+emprestimos['next_pymnt_d'] = emprestimos['next_pymnt_d'].fillna(pagos)
+#!
+prejuizo = emprestimos.loc[mask, 'loan_status'][emprestimos.loc[mask, 'loan_status'] == 'Charged Off'].index.values
+prejuizo = emprestimos.iloc[prejuizo]['next_pymnt_d'].fillna('charged_off')
+emprestimos['next_pymnt_d'] = emprestimos['next_pymnt_d'].fillna(prejuizo)
+#!
+#!
+# 'mths_since_rcnt_il': se não existe informação sobre a última concessão de crédito
+# ao tomador, infere-se que o contrato vigente foi o último na análise. Logo, fillna(-1)
+emprestimos['mths_since_rcnt_il'] = emprestimos['mths_since_rcnt_il'].fillna(-1)
+#!
+#!
+# 'emp_length' fillna('Unknown'), não tem como inferir tempo de emprego dos proponentes
+emprestimos['emp_length'] = emprestimos['emp_length'].fillna('Unknown')
+#!
+#!
+# 'earliest_cr_line' também não tem como inferir data do primeiro crédito concedido
+# ao tomador, então  utiliza-se este como referência
+mask = emprestimos['earliest_cr_line'].isnull()
+earliest = emprestimos.loc[mask, 'issue_d']
+emprestimos['earliest_cr_line'] = emprestimos['earliest_cr_line'].fillna(earliest)
+#!
+#!
+# 'emp_title' fillna('Unknown'), impossível inferir cargo do proponente
+emprestimos['emp_title'] = emprestimos['emp_title'].fillna('Unknown')
+
+#!
+# 'title' cria uma nova variável, se o emprestimo tem nome ou não (de repente se o tomador nomeia o empréstimo o pagamento pode ser favorável)
+#!
+#!
+
+# A feature 'last_pymnt_d' refere-se ao último pagamento recebido (com ref base 09/2020).
+# Imputações baseam-se nas informações de 'loan_status':
+# [0] Charged off: 150 dias de atraso
+# [1] Issued: pelo menos 121 dias de atraso
+# [2] Late (31-120 days)
+# [3] In grace period: até 15 dias de atraso (não tem ônus)
+# [4] Does not meet the credit policy. Status: Charged Off' (pois é, não sei)
+# [5] Late (16-30 days)
+# [6] Current: em dia, não está em atraso. 
+mask = emprestimos['last_pymnt_d'].isnull()
+statuses = emprestimos.loc[mask, 'loan_status'].value_counts().index.to_list()
+#!
+# Status Charged off
+#!
+# Status Issued
+#!
+# Status Late (31-120 days)
+#!
+# Status In grace period
+#!
+# Status Does not meet the credit policy. Status: Charged Off' (pois é, não sei)
+#!
+# Status Late (16-30 days)
+#!
+# Status Current
+mask_stat = emprestimos.loc[mask, 'loan_status'][emprestimos.loc[mask, 'loan_status'] == statuses[6]].index.values
+stat = emprestimos.iloc[mask_stat]['last_pymnt_d'].fillna(emprestimos['issue_d'].max())
+emprestimos['last_pymnt_d'] = emprestimos['last_pymnt_d'].fillna(stat)
+#!
+# Transforma a feature de str para data:
+# emprestimos['last_pymnt_d'] = separa_datas(emprestimos, 'last_pymnt_d')
+
+
+
+emprestimos.loc[mask, 'loan_status'].value_counts()
+
+# 'title' - nome do empréstimo. Procedimento de binning aqui, as categorias mais significativas
+# serão mantidas como estão, as demais serão enquandadas como 'outros'. Utilizada
+# representatividade > 0.65% em função de ser o limiar que não repete categorias
+# similares.
+# Antes de qualquer processo de binning, os valores NaN são imputados como 'unknown'.
+#!
+# Primeiro: tudo que é cartão, coloca em cartão
+# segundo: tudo que é consolidação, vai em consolidação
+# terceiro: procura por medical, hospital, dentistry, etc
+# quarto: business
+# quinto: home/house, etc
+# sexto: veículos
+sem_nome = emprestimos['title'].isnull()
+emprestimos['title'] = emprestimos['title'].fillna('Unknown')
+relacao = emprestimos.loc[~sem_nome, 'title'].value_counts(normalize=True)
+relacao = relacao[relacao > 0.0065].index.to_list()
+relacao.append('Unknown')
+mask_fica = emprestimos['title'].isin(relacao)
+nomes = emprestimos.loc[~mask_fica, 'title']
+#!
+# Primeiro faz uma leitura de possíveis enquadramentos
+# de cartão de crédito (geral)
+card = []
+for obs in nomes.to_list():
+    if "american expresscard" in obs.lower():
+        card.append(obs)
+    if "card" in obs.lower():
+        card.append(obs)
+#!
+# Em seguida faz a substituição dos valores de grafia diversa
+# como relacao[1]
+for obs in pd.Series(card).unique():
+    mask = nomes == obs
+    nomes.loc[mask] = relacao[1]
+#!
+#!
+# Segunda etapa, consolidações de débitos
+consolid = []
+for obs in nomes.to_list():
+    if "eliminat" in obs.lower():
+        consolid.append(obs)
+    if "consol" in obs.lower():
+        consolid.append(obs)
+    if "debt" in obs.lower():
+        consolid.append(obs)
+    if "pay" in obs.lower():
+        consolid.append(obs)
+    if "financ" in obs.lower():
+        consolid.append(obs)
+# Substituindo os valores como relacao[0]
+for obs in pd.Series(consolid).unique():
+    mask = nomes == obs
+    nomes.loc[mask] = relacao[0]
+#!
+# Terceira etapa, despesas médicas e de saúde
+medic = []
+for obs in nomes.to_list():
+    if "medic" in obs.lower():
+        medic.append(obs)
+    if "hospital" in obs.lower():
+        medic.append(obs)
+    if "health" in obs.lower():
+        medic.append(obs)
+    if "dentist" in obs.lower():
+        medic.append(obs)
+# Substituindo os valores como relacao[5]
+for obs in pd.Series(medic).unique():
+    mask = nomes == obs
+    nomes.loc[mask] = relacao[5]
+#!
+# Quarta etapa, relativo a empresas e empreendimentos
+startup = []
+for obs in nomes.to_list():
+    if "business" in obs.lower():
+        startup.append(obs)
+    if "startup" in obs.lower():
+        startup.append(obs)
+    if "start-up" in obs.lower():
+        startup.append(obs)
+# Substituindo os valores como relacao[7]
+for obs in pd.Series(startup).unique():
+    mask = nomes == obs
+    nomes.loc[mask] = relacao[7]
+#!
+# Quinta etapa, relativo à casa e moradia
+casa = []
+for obs in nomes.to_list():
+    if "real state" in obs.lower():
+        casa.append(obs)
+    if "home" in obs.lower():
+        casa.append(obs)
+    if "property" in obs.lower():
+        casa.append(obs)
+    if "house" in obs.lower():
+        casa.append(obs)
+    if "construc" in obs.lower():
+        casa.append(obs)
+    if "kitchen" in obs.lower():
+        casa.append(obs)
+    if "room" in obs.lower():
+        casa.append(obs)
+    if "backyard" in obs.lower():
+        casa.append(obs)
+    if "back yard" in obs.lower():
+        casa.append(obs)
+    if "pool" in obs.lower():
+        casa.append(obs)
+    if "basement" in obs.lower():
+        casa.append(obs)
+    if "roof" in obs.lower():
+        casa.append(obs)
+    if "moving" in obs.lower():
+        casa.append(obs)
+    if "apartment" in obs.lower():
+        casa.append(obs)
+    if "hot tub" in obs.lower()::
+        casa.append(obs)
+    if "windows" in obs.lower()::
+        casa.append(obs)
+# Substituindo os valores como relacao[2]
+for obs in pd.Series(casa).unique():
+    mask = nomes == obs
+    nomes.loc[mask] = relacao[2]
+#!
+# Sexta etapa, veículos e similares
+veiculos = []
+for obs in nomes.to_list():
+    if "car" in obs.lower():
+        veiculos.append(obs)
+    if "motor" in obs.lower():
+        veiculos.append(obs)
+    if "bike" in obs.lower():
+        veiculos.append(obs)
+    if "vehicle" in obs.lower():
+        veiculos.append(obs)
+    if "triumph" in obs.lower():
+        veiculos.append(obs)
+    if "wheeler" in obs.lower():
+        veiculos.append(obs)
+    if "honda" in obs.lower():
+        veiculos.append(obs)
+    if "boat" in obs.lower():
+        veiculos.append(obs)
+    if "truck" in obs.lower():
+        veiculos.append(obs)
+    if "engine" in obs.lower():
+        veiculos.append(obs)
+# Substituindo os valores como relacao[6]
+for obs in pd.Series(veiculos).unique():
+    mask = nomes == obs
+    nomes.loc[mask] = relacao[6]
+#!
+
+# O resto joga tudo em um balaio só e dane-se
+
+relacao[6]
+
+
+
+
+
+nomes.value_counts().head(150)
+
+
+
+"""
+poderia enquadrar:
+- real state/home/house
+moving
+debt consolidation (ou só 'debt' e só 'consolidation')
+'card'
+
+
+'home improvement' poderia ser transformado para 'home general', incluindo 
+
+
+
+"""
+analise_nans(objetos, emprestimos)
+
+
+
+emprestimos['emp_length'].isnull().sum()
 
 
 
 
 
 
+objetos = emprestimos.dtypes[emprestimos.dtypes == 'object'].index.to_list()
+floats = emprestimos.dtypes[emprestimos.dtypes == 'float64'].index.to_list()
 
 
+
+
+
+emprestimos.info()
+
+emprestimos[objetos]
+
+analise_geral(objetos, emprestimos)
+
+analise
+
+analise_nans(floats, emprestimos)
 
 
 
