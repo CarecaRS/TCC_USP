@@ -5,7 +5,7 @@ import seaborn as sns
 #from datetime import datetime
 pd.set_option('display.max_rows', 250)
 pd.set_option('display.max_columns', None)
-np.set_printoptions(suppress=True, precision=6)
+np.set_printoptions(suppress=True, precision=4)
 %autoindent OFF 
 
 #from sklearn.metrics import r2_score, log_loss
@@ -483,11 +483,244 @@ emprestimos['earliest_cr_line'] = emprestimos['earliest_cr_line'].fillna(earlies
 #!
 # 'emp_title' fillna('Unknown'), impossível inferir cargo do proponente
 emprestimos['emp_title'] = emprestimos['emp_title'].fillna('Unknown')
+#!
+#!
+# 'title' - nome do empréstimo. Já tem uma feature com o objetivo do
+# empréstimo proposto ('purpose'). Pode apenas fazer uma feature nova
+# binária tipo 'empréstimo tem nome? sim/não'.
+# Procedimento de binning aqui, as categorias mais significativas
+# serão mantidas como estão, as demais serão enquandadas como 'outros'. Utilizada
+# representatividade > 0.65% em função de ser o limiar que não repete categorias
+# similares.
+# Antes de qualquer processo de binning, os valores NaN são imputados como 'unknown'.
+#!
+sem_nome = emprestimos['title'].isnull()
+emprestimos['title'] = emprestimos['title'].fillna('Unknown')
+relacao = emprestimos.loc[~sem_nome, 'title'].value_counts(normalize=True)
+relacao = relacao[relacao > 0.0065].index.to_list()
+relacao.append('Unknown')
+mask_fica = emprestimos['title'].isin(relacao)
+#nomes = emprestimos.loc[~mask_fica, 'title']
+nomes = emprestimos['title'].copy()
 
 #!
-# 'title' cria uma nova variável, se o emprestimo tem nome ou não (de repente se o tomador nomeia o empréstimo o pagamento pode ser favorável)
+# Primeiro faz uma leitura de possíveis enquadramentos
+# de cartão de crédito (geral)
+card = []
+for obs in nomes.to_list():
+    if "american express" in obs.lower():
+        card.append(obs)
+    if "card" in obs.lower():
+        card.append(obs)
+#!
+# Em seguida faz a substituição dos valores de grafia diversa
+# como relacao[1]
+for obs in pd.Series(card).unique():
+    mask = nomes == obs
+    nomes.loc[mask] = relacao[1]
+#!
+# Segunda etapa, consolidações de débitos
+consolid = []
+for obs in nomes.to_list():
+    if "eliminat" in obs.lower():
+        consolid.append(obs)
+    if "consol" in obs.lower():
+        consolid.append(obs)
+    if "debt" in obs.lower():
+        consolid.append(obs)
+    if "pay" in obs.lower():
+        consolid.append(obs)
+    if "bills" in obs.lower():
+        consolid.append(obs)
+    if "finance" in obs.lower():
+        consolid.append(obs)
+# Substituindo os valores como relacao[0]
+for obs in pd.Series(consolid).unique():
+    mask = nomes == obs
+    nomes.loc[mask] = relacao[0]
+#!
+# Terceira etapa, despesas médicas e de saúde
+medic = []
+for obs in nomes.to_list():
+    if "medic" in obs.lower():
+        medic.append(obs)
+    if "hospital" in obs.lower():
+        medic.append(obs)
+    if "health" in obs.lower():
+        medic.append(obs)
+    if "dentist" in obs.lower():
+        medic.append(obs)
+# Substituindo os valores como relacao[5]
+for obs in pd.Series(medic).unique():
+    mask = nomes == obs
+    nomes.loc[mask] = relacao[5]
+#!
+# Quinta etapa, relativo a reforma de casa própria
+casa_reforma = []
+for obs in nomes.to_list():
+    if "improv" in obs.lower():
+        casa_reforma.append(obs)
+    if "house" in obs.lower():
+        casa_reforma.append(obs)
+    if "kitchen" in obs.lower():
+        casa_reforma.append(obs)
+    if "room" in obs.lower():
+        casa_reforma.append(obs)
+    if "backyard" in obs.lower():
+        casa_reforma.append(obs)
+    if "back yard" in obs.lower():
+        casa_reforma.append(obs)
+    if "floor" in obs.lower():
+        casa_reforma.append(obs)
+    if "pool" in obs.lower():
+        casa_reforma.append(obs)
+    if "basement" in obs.lower():
+        casa_reforma.append(obs)
+    if "roof" in obs.lower():
+        casa_reforma.append(obs)
+    if "hot tub" in obs.lower():
+        casa_reforma.append(obs)
+    if "windows" in obs.lower():
+        casa_reforma.append(obs)
+# Substituindo os valores como relacao[2]
+for obs in pd.Series(casa_reforma).unique():
+    mask = nomes == obs
+    nomes.loc[mask] = 'House improvement'
+#!
+# Sexta etapa, relativo a compra de imóveis
+casa_compra = []
+for obs in nomes.to_list():
+    if "real state" in obs.lower():
+        casa_compra.append(obs)
+    if "property" in obs.lower():
+        casa_compra.append(obs)
+    if "construc" in obs.lower():
+        casa_compra.append(obs)
+    if "moving" in obs.lower():
+        casa_compra.append(obs)
+    if "apartment" in obs.lower():
+        casa_compra.append(obs)
+    if "home" in obs.lower():
+        casa_compra.append(obs)
+# Substituindo os valores como relacao[2]
+for obs in pd.Series(casa_compra).unique():
+    mask = nomes == obs
+    nomes.loc[mask] = 'Real Estate'
+#!
+# Quarta etapa, relativo a empresas e empreendimentos
+startup = []
+for obs in nomes.to_list():
+    if "business" in obs.lower():
+        startup.append(obs)
+    if "personel" in obs.lower():
+        startup.append(obs)
+    if "startup" in obs.lower():
+        startup.append(obs)
+    if "start-up" in obs.lower():
+        startup.append(obs)
+# Substituindo os valores como relacao[7]
+for obs in pd.Series(startup).unique():
+    mask = nomes == obs
+    nomes.loc[mask] = relacao[7]
+#!
+# Setima etapa, veículos e similares
+veiculos = []
+for obs in nomes.to_list():
+    if "car " in obs.lower():
+        veiculos.append(obs)
+    if "motor" in obs.lower():
+        veiculos.append(obs)
+    if "bike" in obs.lower():
+        veiculos.append(obs)
+    if "vehicle" in obs.lower():
+        veiculos.append(obs)
+    if "triumph" in obs.lower():
+        veiculos.append(obs)
+    if "wheeler" in obs.lower():
+        veiculos.append(obs)
+    if "honda" in obs.lower():
+        veiculos.append(obs)
+    if "boat" in obs.lower():
+        veiculos.append(obs)
+    if "truck" in obs.lower():
+        veiculos.append(obs)
+    if "engine" in obs.lower():
+        veiculos.append(obs)
+# Substituindo os valores como relacao[6]
+for obs in pd.Series(veiculos).unique():
+    mask = nomes == obs
+    nomes.loc[mask] = relacao[6]
+#!
+# Oitava etapa, green loans e empréstimos pessoais
+verdes = []
+for obs in nomes.to_list():
+    if "green" in obs.lower():
+        verdes.append(obs)
+# Substituindo os valores como relacao[6]
+for obs in pd.Series(verdes).unique():
+    mask = nomes == obs
+    nomes.loc[mask] = 'Green loan'
+#!
+pessoal = []
+for obs in nomes.to_list():
+    if "personal" in obs.lower():
+        pessoal.append(obs)
+    if "my" in obs.lower():
+        pessoal.append(obs)
+    if "freedom" in obs.lower():
+        pessoal.append(obs)
+    if "fresh start" in obs.lower():
+        pessoal.append(obs)
+    if "wedding" in obs.lower():
+        pessoal.append(obs)
+# Substituindo os valores como relacao[6]
+for obs in pd.Series(pessoal).unique():
+    mask = nomes == obs
+    nomes.loc[mask] = 'Personal Loan'
+#!
+# Última etapa, tudo que não for enquadramento constante em
+# 'relacao' é classificado como 'Outros'. O dataset original já
+# possui um enquandramentto 'Others', aqui opta-se por separar
+# essas classificações para evitar ruídos
+#!
+relacao = nomes.value_counts(normalize=True).head(8).index.to_list()
+mask = nomes.isin(relacao)
+nomes.loc[~mask] = 'Outros'
+
+
+emprestimos['title'].head(20)
+
+len(nomes)
+
+"""
+"""
+
+nomes.head(20)
+
+emprestimos['title'] = emprestimos['title'].fillna(nomes)  # retorna ao dataset original depois de pronto
+
+emprestimos.loc[sem_nome, 'title']
+
+emprestimos['title'].isnull().sum()
+
+# comecei 13:34 / 14:04 ainda no primeiro / segunda em 14:17, quinte em 15:47 / oitava começou 16:13
+
+
+nomes.value_counts(normalize=True)
+
+names = pd.read_parquet('data/titles.parquet')
+
+
+
+# Feature last_credit_pull_d refere-se ao mês em que foi realizada
+# a última consulta ao FICO (credito score) do cliente. Pressupõe-se
+# que pelo menos no mês de liberação do crédito tenha sido consultado.
+mask = emprestimos['last_credit_pull_d'].isnull()
+liberados = emprestimos.loc[mask, 'issue_d']
+emprestimos['last_credit_pull_d'] = emprestimos['last_credit_pull_d'].fillna(liberados)
 #!
 #!
+
 
 # A feature 'last_pymnt_d' refere-se ao último pagamento recebido (com ref base 09/2020).
 # Imputações baseam-se nas informações de 'loan_status':
@@ -520,219 +753,47 @@ emprestimos['last_pymnt_d'] = emprestimos['last_pymnt_d'].fillna(stat)
 #!
 # Transforma a feature de str para data:
 # emprestimos['last_pymnt_d'] = separa_datas(emprestimos, 'last_pymnt_d')
-
-
-
+#!
+#!
+#!
 emprestimos.loc[mask, 'loan_status'].value_counts()
-
-# 'title' - nome do empréstimo. Procedimento de binning aqui, as categorias mais significativas
-# serão mantidas como estão, as demais serão enquandadas como 'outros'. Utilizada
-# representatividade > 0.65% em função de ser o limiar que não repete categorias
-# similares.
-# Antes de qualquer processo de binning, os valores NaN são imputados como 'unknown'.
-#!
-# Primeiro: tudo que é cartão, coloca em cartão
-# segundo: tudo que é consolidação, vai em consolidação
-# terceiro: procura por medical, hospital, dentistry, etc
-# quarto: business
-# quinto: home/house, etc
-# sexto: veículos
-sem_nome = emprestimos['title'].isnull()
-emprestimos['title'] = emprestimos['title'].fillna('Unknown')
-relacao = emprestimos.loc[~sem_nome, 'title'].value_counts(normalize=True)
-relacao = relacao[relacao > 0.0065].index.to_list()
-relacao.append('Unknown')
-mask_fica = emprestimos['title'].isin(relacao)
-nomes = emprestimos.loc[~mask_fica, 'title']
-#!
-# Primeiro faz uma leitura de possíveis enquadramentos
-# de cartão de crédito (geral)
-card = []
-for obs in nomes.to_list():
-    if "american expresscard" in obs.lower():
-        card.append(obs)
-    if "card" in obs.lower():
-        card.append(obs)
-#!
-# Em seguida faz a substituição dos valores de grafia diversa
-# como relacao[1]
-for obs in pd.Series(card).unique():
-    mask = nomes == obs
-    nomes.loc[mask] = relacao[1]
-#!
-#!
-# Segunda etapa, consolidações de débitos
-consolid = []
-for obs in nomes.to_list():
-    if "eliminat" in obs.lower():
-        consolid.append(obs)
-    if "consol" in obs.lower():
-        consolid.append(obs)
-    if "debt" in obs.lower():
-        consolid.append(obs)
-    if "pay" in obs.lower():
-        consolid.append(obs)
-    if "financ" in obs.lower():
-        consolid.append(obs)
-# Substituindo os valores como relacao[0]
-for obs in pd.Series(consolid).unique():
-    mask = nomes == obs
-    nomes.loc[mask] = relacao[0]
-#!
-# Terceira etapa, despesas médicas e de saúde
-medic = []
-for obs in nomes.to_list():
-    if "medic" in obs.lower():
-        medic.append(obs)
-    if "hospital" in obs.lower():
-        medic.append(obs)
-    if "health" in obs.lower():
-        medic.append(obs)
-    if "dentist" in obs.lower():
-        medic.append(obs)
-# Substituindo os valores como relacao[5]
-for obs in pd.Series(medic).unique():
-    mask = nomes == obs
-    nomes.loc[mask] = relacao[5]
-#!
-# Quarta etapa, relativo a empresas e empreendimentos
-startup = []
-for obs in nomes.to_list():
-    if "business" in obs.lower():
-        startup.append(obs)
-    if "startup" in obs.lower():
-        startup.append(obs)
-    if "start-up" in obs.lower():
-        startup.append(obs)
-# Substituindo os valores como relacao[7]
-for obs in pd.Series(startup).unique():
-    mask = nomes == obs
-    nomes.loc[mask] = relacao[7]
-#!
-# Quinta etapa, relativo à casa e moradia
-casa = []
-for obs in nomes.to_list():
-    if "real state" in obs.lower():
-        casa.append(obs)
-    if "home" in obs.lower():
-        casa.append(obs)
-    if "property" in obs.lower():
-        casa.append(obs)
-    if "house" in obs.lower():
-        casa.append(obs)
-    if "construc" in obs.lower():
-        casa.append(obs)
-    if "kitchen" in obs.lower():
-        casa.append(obs)
-    if "room" in obs.lower():
-        casa.append(obs)
-    if "backyard" in obs.lower():
-        casa.append(obs)
-    if "back yard" in obs.lower():
-        casa.append(obs)
-    if "pool" in obs.lower():
-        casa.append(obs)
-    if "basement" in obs.lower():
-        casa.append(obs)
-    if "roof" in obs.lower():
-        casa.append(obs)
-    if "moving" in obs.lower():
-        casa.append(obs)
-    if "apartment" in obs.lower():
-        casa.append(obs)
-    if "hot tub" in obs.lower()::
-        casa.append(obs)
-    if "windows" in obs.lower()::
-        casa.append(obs)
-# Substituindo os valores como relacao[2]
-for obs in pd.Series(casa).unique():
-    mask = nomes == obs
-    nomes.loc[mask] = relacao[2]
-#!
-# Sexta etapa, veículos e similares
-veiculos = []
-for obs in nomes.to_list():
-    if "car" in obs.lower():
-        veiculos.append(obs)
-    if "motor" in obs.lower():
-        veiculos.append(obs)
-    if "bike" in obs.lower():
-        veiculos.append(obs)
-    if "vehicle" in obs.lower():
-        veiculos.append(obs)
-    if "triumph" in obs.lower():
-        veiculos.append(obs)
-    if "wheeler" in obs.lower():
-        veiculos.append(obs)
-    if "honda" in obs.lower():
-        veiculos.append(obs)
-    if "boat" in obs.lower():
-        veiculos.append(obs)
-    if "truck" in obs.lower():
-        veiculos.append(obs)
-    if "engine" in obs.lower():
-        veiculos.append(obs)
-# Substituindo os valores como relacao[6]
-for obs in pd.Series(veiculos).unique():
-    mask = nomes == obs
-    nomes.loc[mask] = relacao[6]
 #!
 
-# O resto joga tudo em um balaio só e dane-se
-
-relacao[6]
 
 
-
-
-
-nomes.value_counts().head(150)
-
-
-
-"""
-poderia enquadrar:
-- real state/home/house
-moving
-debt consolidation (ou só 'debt' e só 'consolidation')
-'card'
-
-
-'home improvement' poderia ser transformado para 'home general', incluindo 
-
-
-
-"""
+numeros = emprestimos.dtypes[emprestimos.dtypes == 'float64'].index.values
+objetos = emprestimos.dtypes[emprestimos.dtypes == 'object'].index.values
 analise_nans(objetos, emprestimos)
 
+analise_nans(numeros, emprestimos)
+
+emprestimos['total_rev_hi_lim']
+
+mask = emprestimos['last_pymnt_d'].isnull()
+emprestimos.loc[mask, ['loan_status', 'issue_d']]#.value_counts()
+emprestimos.loc[mask, 'issue_d'].value_counts()
 
 
-emprestimos['emp_length'].isnull().sum()
+emprestimos[['purpose', 'title']].head(100)
 
+emprestimos['title'].value_counts()
 
+"""
+approach 1
+mês atual (set/2020) pega os prazos de enquadramento em cada uma das situações e infere uma data plausível qualquer
 
+approach 2 MELHOR
+cálculo com mês de liberação do empréstimo e prazo total. se tiver saldo devedor total (total_bal_il ou tot_cur_bal ou tot_hi_cred_lim) dá para inferir quantas parcelas o cara pagou.
 
+tem loan_amount, int_rate e installment
 
+pub_rec_bankruptcies (com cuidado essa), inq_fi, mort_acc se tá NaN substitui por zero
 
-objetos = emprestimos.dtypes[emprestimos.dtypes == 'object'].index.to_list()
-floats = emprestimos.dtypes[emprestimos.dtypes == 'float64'].index.to_list()
+total_cu_tl = open_act_il ou total_acc
 
+"""
 
-
-
-
-emprestimos.info()
-
-emprestimos[objetos]
-
-analise_geral(objetos, emprestimos)
-
-analise
-
-analise_nans(floats, emprestimos)
-
-
-
+emprestimos.head(500).to_csv('data/thiago.csv')
 
 
 # Verificação das dimensões do dataset limpo
@@ -740,8 +801,6 @@ print(f'Número de observações (linhas): {emprestimos.shape[0]}')  # 2260701
 print(f'Número de features (colunas): {emprestimos.shape[1]}')  # 105
 
 
-float_cols = emprestimos.dtypes[emprestimos.dtypes == 'float64'].index.values  # 81
-obj_cols = emprestimos.dtypes[emprestimos.dtypes == 'object'].index.values  # 24
 
 
 # Grafico das correlações no df completo
