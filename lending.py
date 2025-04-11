@@ -102,31 +102,36 @@ def analise_nans(lista, dataframe: pd.DataFrame):
         print(f'Nome: {str(x).upper()}')
         print(f'Definição: {dic[dic['Feature'] == str(x)]['Descrição'].values}')
     if len(lista) > 1:
-        print('\n')
-        print('Calculando tamanho da solicitação... Só um instante por favor.')
-        tam = len(dataframe[lista].isnull().sum()[dataframe[lista].isnull().sum() > 0])
-        idx = 1
-        for i in range(0, len(lista)):
-            if dataframe[lista[i]].isnull().sum() == 0:
-                pass
-            else:
-                print('\n')
-                print(f'Feature #{idx}/{tam}')
-                significado(lista[i])
-                print(f'Tipo de dado: {str(dataframe[lista[i]].dtypes).upper()}')
-                print(f'Quantidade total de NaNs: {dataframe[lista[i]].isnull().sum()}')
-                print(f'Proporção desses NaNs: {round((dataframe[lista[i]].isnull().sum()/len(dataframe))*100, 2)}%')
-                idx += 1
+        if dataframe[lista[0]].isnull().sum() == 0:
+            print('\n')
+            print('==> Sem NaNs nessa lista, parabéns.')
+        else:
+            print('\n')
+            print('Calculando tamanho da solicitação... Só um instante por favor.')
+            tam = len(dataframe[lista].isnull().sum()[dataframe[lista].isnull().sum() > 0])
+            idx = 1
+            for i in range(0, len(lista)):
+                if dataframe[lista[i]].isnull().sum() == 0:
+                    pass
+                else:
+                    print('\n')
+                    print(f'Feature #{idx}/{tam}')
+                    significado(lista[i])
+                    print(f'Tipo de dado: {str(dataframe[lista[i]].dtypes).upper()}')
+                    print(f'Quantidade total de NaNs: {dataframe[lista[i]].isnull().sum()}')
+                    print(f'Proporção desses NaNs: {round((dataframe[lista[i]].isnull().sum()/len(dataframe))*100, 2)}%')
+                    idx += 1
     elif len(lista) == 1:
         if dataframe[lista[0]].isnull().sum() == 0:
             print('\n')
-            print('Sem NaNs nessa lista.')
+            print('==> Sem NaNs nessa lista, parabéns.')
         else:
             print('\n')
             significado(lista[0])
             print(f'Tipo de dado: {str(dataframe[lista[0]].dtypes).upper()}')
             print(f'Quantidade total de NaNs: {dataframe[lista[0]].isnull().sum()}')
             print(f'Proporção desses NaNs: {round((dataframe[lista[0]].isnull().sum()/len(dataframe))*100, 2)}%')
+
 
 
 ############
@@ -445,10 +450,6 @@ emprestimos.drop(dropar, axis=1, inplace=True)
 # Ajuste feature 'term' (prazo) para numérica
 emprestimos['term'] = emprestimos['term'].replace({emprestimos.loc[0, 'term']: 36, emprestimos.loc[1, 'term']: 60})
 #!
-# Load dos valores em 'title' já ajustados
-nomes = pd.read_parquet('data/nomes.parquet')
-emprestimos['title'] = nomes
-
 # Uma observação completamente NaN, dropando abaixo e já refazendo o index
 nulo = emprestimos['home_ownership'].isnull()
 nulo = emprestimos.loc[nulo].index.values
@@ -502,13 +503,17 @@ emprestimos['emp_title'] = emprestimos['emp_title'].fillna('Unknown')
 # similares.
 # Antes de qualquer processo de binning, os valores NaN são imputados como 'unknown'.
 #!
-sem_nome = emprestimos['title'].isnull()
-emprestimos['title'] = emprestimos['title'].fillna('Unknown')
-relacao = emprestimos.loc[~sem_nome, 'title'].value_counts(normalize=True)
-relacao = relacao[relacao > 0.0065].index.to_list()
-relacao.append('Unknown')
-nomes = emprestimos['title'].copy()
-
+#sem_nome = emprestimos['title'].isnull()
+#emprestimos['title'] = emprestimos['title'].fillna('Unknown')
+#relacao = emprestimos.loc[~sem_nome, 'title'].value_counts(normalize=True)
+#relacao = relacao[relacao > 0.0065].index.to_list()
+#relacao.append('Unknown')
+#nomes = emprestimos['title'].copy()
+# Load dos valores em 'title' já ajustados
+nomes = pd.read_parquet('data/nomes.parquet')
+emprestimos['title'] = nomes
+#!
+"""
 # Seção comentada para não refazer todo santo script, demora horas
 # para concluir. Dados processados já salvos em data/titles.parquet
 #!
@@ -526,7 +531,7 @@ for obs in nomes.to_list():
 for obs in pd.Series(card).unique():
     mask = nomes == obs
     nomes.loc[mask] = relacao[1]
-
+#!
 # Segunda etapa, consolidações de débitos
 consolid = []
 for obs in nomes.to_list():
@@ -546,7 +551,7 @@ for obs in nomes.to_list():
 for obs in pd.Series(consolid).unique():
     mask = nomes == obs
     nomes.loc[mask] = relacao[0]
-
+#!
 # Terceira etapa, despesas médicas e de saúde
 medic = []
 for obs in nomes.to_list():
@@ -562,7 +567,7 @@ for obs in nomes.to_list():
 for obs in pd.Series(medic).unique():
     mask = nomes == obs
     nomes.loc[mask] = relacao[5]
-
+#!
 # Quinta etapa, relativo a reforma de casa própria
 casa_reforma = []
 for obs in nomes.to_list():
@@ -594,7 +599,7 @@ for obs in nomes.to_list():
 for obs in pd.Series(casa_reforma).unique():
     mask = nomes == obs
     nomes.loc[mask] = 'House improvement'
-
+#!
 # Sexta etapa, relativo a compra de imóveis
 casa_compra = []
 for obs in nomes.to_list():
@@ -614,7 +619,7 @@ for obs in nomes.to_list():
 for obs in pd.Series(casa_compra).unique():
     mask = nomes == obs
     nomes.loc[mask] = 'Real Estate'
-
+#!
 # Quarta etapa, relativo a empresas e empreendimentos
 startup = []
 for obs in nomes.to_list():
@@ -630,7 +635,7 @@ for obs in nomes.to_list():
 for obs in pd.Series(startup).unique():
     mask = nomes == obs
     nomes.loc[mask] = relacao[7]
-
+#!
 # Setima etapa, veículos e similares
 veiculos = []
 for obs in nomes.to_list():
@@ -658,7 +663,6 @@ for obs in nomes.to_list():
 for obs in pd.Series(veiculos).unique():
     mask = nomes == obs
     nomes.loc[mask] = relacao[6]
-
 #!
 # Oitava etapa, green loans e empréstimos pessoais
 verdes = []
@@ -686,8 +690,6 @@ for obs in nomes.to_list():
 for obs in pd.Series(pessoal).unique():
     mask = nomes == obs
     nomes.loc[mask] = 'Personal Loan'
-
-
 #!
 # Última etapa, tudo que não for enquadramento constante em
 # 'relacao' é classificado como 'Outros'. O dataset original já
@@ -697,14 +699,9 @@ for obs in pd.Series(pessoal).unique():
 relacao = nomes.value_counts(normalize=True).head(8).index.to_list()
 mask = nomes.isin(relacao)
 nomes.loc[~mask] = 'Outros'
-
-
-pd.DataFrame(nomes).to_parquet('data/nomes.parquet')
-
-emprestimos['title']
-
-
-
+#!
+"""
+#!
 # Feature last_credit_pull_d refere-se ao mês em que foi realizada
 # a última consulta ao FICO (credito score) do cliente. Pressupõe-se
 # que pelo menos no mês de liberação do crédito tenha sido consultado.
@@ -723,6 +720,7 @@ emprestimos['last_credit_pull_d'] = emprestimos['last_credit_pull_d'].fillna(lib
 # [5] Late (16-30 days)
 # [6] Current: em dia, não está em atraso. 
 #!
+pgto = emprestimos['last_pymnt_d'].isnull()
 statuses = emprestimos.loc[pgto, 'loan_status'].value_counts().index.to_list()  # pega a relação dos status possíveis
 emprestimos['last_pymnt_d'] = pd.to_datetime(emprestimos['last_pymnt_d'], format='%b-%Y')  # reformata de 'object' para data
 emprestimos['issue_d'] = pd.to_datetime(emprestimos['issue_d'], format='%b-%Y')
@@ -763,7 +761,6 @@ mask = emprestimos.loc[pgto, 'loan_status'] == statuses[6]
 idx = emprestimos.loc[pgto, 'last_pymnt_d'][mask].index.to_list()
 emprestimos.loc[idx, 'last_pymnt_d'] = mes_ref
 #!
-
 
 
 
