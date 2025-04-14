@@ -1,9 +1,10 @@
 import pandas as pd
-from pandas.tseries.offsets import DateOffset
+from pandas.tseries.offsets import DateOffset, Day
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
-#from datetime import datetime
+import datetime
+import dateutil.relativedelta
 pd.set_option('display.max_rows', 250)
 pd.set_option('display.max_columns', None)
 np.set_printoptions(suppress=True, precision=4)
@@ -101,13 +102,12 @@ def analise_nans(lista, dataframe: pd.DataFrame):
         dic = pd.read_csv('./data/dictionary.csv', index_col=False)
         print(f'Nome: {str(x).upper()}')
         print(f'Definição: {dic[dic['Feature'] == str(x)]['Descrição'].values}')
+    print('\nVerificando...')
     if len(lista) > 1:
-        if dataframe[lista[0]].isnull().sum() == 0:
-            print('\n')
+        if any(dataframe[lista].isnull().sum() > 1) == False:
             print('==> Sem NaNs nessa lista, parabéns.')
         else:
-            print('\n')
-            print('Calculando tamanho da solicitação... Só um instante por favor.')
+            print('Calculando tamanho da solicitação, só um instante por favor.')
             tam = len(dataframe[lista].isnull().sum()[dataframe[lista].isnull().sum() > 0])
             idx = 1
             for i in range(0, len(lista)):
@@ -123,7 +123,6 @@ def analise_nans(lista, dataframe: pd.DataFrame):
                     idx += 1
     elif len(lista) == 1:
         if dataframe[lista[0]].isnull().sum() == 0:
-            print('\n')
             print('==> Sem NaNs nessa lista, parabéns.')
         else:
             print('\n')
@@ -441,7 +440,7 @@ joint_ap[zeros] = joint_ap[zeros].fillna(0)
 
 
 ############
-# DATA WRANGLING: TRATAMENTO DAS DEMAIS FEATURES
+# DATA WRANGLING: TRATAMENTO DAS DEMAIS FEATURES CATEGÓRICAS
 #=========================
 emprestimos = pd.read_parquet('data/emprestimos_dropado.parquet')
 dropar = ['Unnamed: 0', 'url', 'zip_code']  # features sem utilização no contexto deste estudo
@@ -761,13 +760,80 @@ mask = emprestimos.loc[pgto, 'loan_status'] == statuses[6]
 idx = emprestimos.loc[pgto, 'last_pymnt_d'][mask].index.to_list()
 emprestimos.loc[idx, 'last_pymnt_d'] = mes_ref
 #!
-
-
-
+#!
+############
+# DATA WRANGLING: TRATAMENTO DAS DEMAIS FEATURES NUMÉRICAS
+#=========================
+#!
+# Verificação de cada feature
 numeros = emprestimos.dtypes[emprestimos.dtypes == 'float64'].index.values
-analise_nans(objetos, emprestimos)
+maiores = emprestimos[numeros].isnull().sum()[emprestimos[numeros].isnull().sum()/emprestimos.shape[0] > 0.1].index.to_list()
+menores = emprestimos[numeros].isnull().sum()[emprestimos[numeros].isnull().sum()/emprestimos.shape[0] < 0.1].index.to_list()
+#analise_nans(numeros, emprestimos)
+#!
+# 'pub_rec_bankruptcies', parte-se do princípio de que se o cliente não tenha
+# informações registradas então o número é zero
+emprestimos['pub_rec_bankruptcies'] = emprestimos['pub_rec_bankruptcies'].fillna(0)
+#!
+# inq_fi substitui-se NaNs por zero:
+emprestimos['inq_fi'] = emprestimos['inq_fi'].fillna(0)
 
-analise_geral(numeros, emprestimos)
+############################################################################
+
+# acc_now_delinq tem ligação com 'last_pymnt_d' e/ouo 'loan_status'
+
+
+
+# status 'Fully Paid', 'In Grace Period' e 'Current' tem 0 meses desde último atraso
+# Nota: o tomador pode sim ter inadimplência em outros contratos em outras instituições,
+# mas trabalha-se com informações incompletas aqui
+mask = emprestimos['loan_status'] == ('Fully Paid' or 'In Grace Period' or 'Current')
+emprestimos.loc[mask, 'mths_since_last_delinq'] = emprestimos.loc[mask, 'mths_since_last_delinq'].fillna(0)
+
+mask = emprestimos['mths_since_last_delinq'].isnull()
+
+emprestimos.loc[mask, 'loan_statmths_since_last_delinq']
+
+
+
+emprestimos[['loan_status', 'mths_since_last_delinq']]
+
+#emprestimos[emprestimos.loc[mask]][mask2]
+
+emprestimos.loc[mask, 'loan_status'].value_counts()
+
+
+analise_nans(maiores, emprestimos)
+
+
+emprestimos[menores].head()
+
+
+d = datetime.datetime.strptime("2013-03-31", "%Y-%m-%d")
+d2 = d - dateutil.relativedelta.relativedelta(mes_ref)
+print(d2)
+
+
+emprestimos['loan_status']
+
+emprestimos['loan_status'].value_counts().index.to_list()
+
+
+
+
+
+
+
+
+
+
+analise_nans(numeros, emprestimos)
+
+
+
+
+
+
 
 
 
