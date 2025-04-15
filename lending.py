@@ -1,5 +1,7 @@
+# REFERÊNCIA: FAZER UM MODELO DE CADA ALGORITIMO ESTILO NAIVE - SÓ DROPA TODOS NANS DO DATASET INICIAL. 
+#
 import pandas as pd
-from pandas.tseries.offsets import DateOffset, Day
+from pandas.tseries.offsets import DateOffset
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -9,7 +11,7 @@ pd.set_option('display.max_rows', 250)
 pd.set_option('display.max_columns', None)
 np.set_printoptions(suppress=True, precision=4)
 %autoindent OFF 
-
+#!
 #from sklearn.metrics import r2_score, log_loss
 #from sklearn.experimental import enable_iterative_imputer
 #from sklearn.impute import IterativeImputer
@@ -20,12 +22,12 @@ np.set_printoptions(suppress=True, precision=4)
 #import xgboost as xgb
 #from catboost import CatBoostClassifier
 #from lightgbm import LGBMClassifier
-
-
+#!
+#!
 ############
 # FUNÇÕES
 #=========================
-
+#!
 # Função para manipulação das datas
 """
 #LEGACY
@@ -60,8 +62,8 @@ def separa_datas(df, col):
         print('\nGerando nova série ajustada.')
         #
         return pd.Series(data=mes_ano, name=col)  # retorna uma série nova
-
-
+#!
+#!
 # Função para buscar a explicação de cada feature no dicionário e analisar NaNs
 def analise_geral(lista, dataframe: pd.DataFrame):
     """
@@ -88,8 +90,8 @@ def analise_geral(lista, dataframe: pd.DataFrame):
         print(f'Tipo de dado: {str(dataframe[lista[0]].dtypes).upper()}')
         print(f'Quantidade total de NaNs: {dataframe[lista[0]].isnull().sum()}')
         print(f'Proporção desses NaNs: {round((dataframe[lista[0]].isnull().sum()/len(dataframe))*100, 2)}%')
-
-
+#!
+#!
 # Função que analisa apenas as features sem NaNs
 def analise_nans(lista, dataframe: pd.DataFrame):
     """
@@ -449,12 +451,6 @@ emprestimos.drop(dropar, axis=1, inplace=True)
 # Ajuste feature 'term' (prazo) para numérica
 emprestimos['term'] = emprestimos['term'].replace({emprestimos.loc[0, 'term']: 36, emprestimos.loc[1, 'term']: 60})
 #!
-# Uma observação completamente NaN, dropando abaixo e já refazendo o index
-nulo = emprestimos['home_ownership'].isnull()
-nulo = emprestimos.loc[nulo].index.values
-emprestimos.drop(nulo, inplace=True)
-emprestimos.reset_index(drop=True, inplace=True)
-#!
 # 'tax_liens' se preenche com zeros, como não tem como estimar essa informação então
 # parte-se do princípio que o tomador não tenha essa recuperação judicial
 emprestimos['tax_liens'] = emprestimos['tax_liens'].fillna(0)
@@ -710,12 +706,13 @@ emprestimos['last_credit_pull_d'] = emprestimos['last_credit_pull_d'].fillna(lib
 #!
 #!
 # A feature 'last_pymnt_d' refere-se ao último pagamento recebido (com ref base 09/2020).
+# Bem como a feature 'mths_since_last_delinq', que refere-se à quantidade de meses desde o último atraso.
 # Imputações baseam-se nas informações de 'loan_status':
 # [0] Charged off: 150 dias de atraso
 # [1] Issued: pelo menos 121 dias de atraso
 # [2] Late (31-120 days)
 # [3] In grace period: até 15 dias de atraso (não tem ônus)
-# [4] Does not meet the credit policy. Status: Charged Off' (pois é, não sei)
+# [4] Does not meet the credit policy. Status: Charged Off': considera-se mesmo prazo do 'charged off'
 # [5] Late (16-30 days)
 # [6] Current: em dia, não está em atraso. 
 #!
@@ -728,42 +725,74 @@ mes_ref = emprestimos['last_pymnt_d'].max()  # considera-se o mês mais recente 
 # [0] Charged Off: -5 meses
 mask = emprestimos.loc[pgto, 'loan_status'] == statuses[0]
 idx = emprestimos.loc[pgto, 'last_pymnt_d'][mask].index.to_list()
-emprestimos.loc[idx, 'last_pymnt_d'] = mes_ref - DateOffset(months=5)
+meses = 5
+emprestimos.loc[idx, 'last_pymnt_d'] = mes_ref - DateOffset(months=meses)
+emprestimos.loc[idx, 'mths_since_last_delinq'] = emprestimos.loc[idx, 'mths_since_last_delinq'].fillna(meses)
 #!
 # [1] Issued: -4 meses
 mask = emprestimos.loc[pgto, 'loan_status'] == statuses[1]
 idx = emprestimos.loc[pgto, 'last_pymnt_d'][mask].index.to_list()
-emprestimos.loc[idx, 'last_pymnt_d'] = mes_ref - DateOffset(months=4)
+meses = 4
+emprestimos.loc[idx, 'last_pymnt_d'] = mes_ref - DateOffset(months=meses)
+emprestimos.loc[idx, 'mths_since_last_delinq'] = emprestimos.loc[idx, 'mths_since_last_delinq'].fillna(meses)
 #!
 # [2] Late (31-120 days): -2 meses
 mask = emprestimos.loc[pgto, 'loan_status'] == statuses[2]
 idx = emprestimos.loc[pgto, 'last_pymnt_d'][mask].index.to_list()
-emprestimos.loc[idx, 'last_pymnt_d'] = mes_ref - DateOffset(months=2)
+meses = 2
+emprestimos.loc[idx, 'last_pymnt_d'] = mes_ref - DateOffset(months=meses)
+emprestimos.loc[idx, 'mths_since_last_delinq'] = emprestimos.loc[idx, 'mths_since_last_delinq'].fillna(meses)
 #!
 # [3] In Grace Period: mes_ref
 mask = emprestimos.loc[pgto, 'loan_status'] == statuses[3]
 idx = emprestimos.loc[pgto, 'last_pymnt_d'][mask].index.to_list()
 emprestimos.loc[idx, 'last_pymnt_d'] = mes_ref
+emprestimos.loc[idx, 'mths_since_last_delinq'] = emprestimos.loc[idx, 'mths_since_last_delinq'].fillna(0)
 #!
 # [4] Does not meet...: -5 meses
 mask = emprestimos.loc[pgto, 'loan_status'] == statuses[4]
 idx = emprestimos.loc[pgto, 'last_pymnt_d'][mask].index.to_list()
-emprestimos.loc[idx, 'last_pymnt_d'] = mes_ref - DateOffset(months=5)
+meses = 5
+emprestimos.loc[idx, 'last_pymnt_d'] = mes_ref - DateOffset(months=meses)
+emprestimos.loc[idx, 'mths_since_last_delinq'] = emprestimos.loc[idx, 'mths_since_last_delinq'].fillna(meses)
 #!
 # [5] Late (16-30 days): -1 mês
 mask = emprestimos.loc[pgto, 'loan_status'] == statuses[5]
 idx = emprestimos.loc[pgto, 'last_pymnt_d'][mask].index.to_list()
-emprestimos.loc[idx, 'last_pymnt_d'] = mes_ref - DateOffset(months=1)
+meses = 1
+emprestimos.loc[idx, 'last_pymnt_d'] = mes_ref - DateOffset(months=meses)
+emprestimos.loc[idx, 'mths_since_last_delinq'] = emprestimos.loc[idx, 'mths_since_last_delinq'].fillna(meses)
 #!
 # [6] Current: mes_ref
 mask = emprestimos.loc[pgto, 'loan_status'] == statuses[6]
 idx = emprestimos.loc[pgto, 'last_pymnt_d'][mask].index.to_list()
 emprestimos.loc[idx, 'last_pymnt_d'] = mes_ref
+emprestimos.loc[idx, 'mths_since_last_delinq'] = emprestimos.loc[idx, 'mths_since_last_delinq'].fillna(0)
 #!
 #!
 ############
 # DATA WRANGLING: TRATAMENTO DAS DEMAIS FEATURES NUMÉRICAS
 #=========================
+#!
+# Variáveis a dropar: todas com NaNs maiores que 20% e que não é possível imputar
+# valores sem contaminar o banco de dados
+dropar = ['mths_since_last_record',
+          'mths_since_last_major_derog',
+          'open_acc_6m',
+          'open_act_il',
+          'open_il_12m',
+          'open_il_24m',
+          'total_bal_il',
+          'il_util',
+          'open_rv_12m',
+          'open_rv_24m',
+          'max_bal_bc',
+          'all_util',
+          'total_cu_tl',
+          'inq_last_12m',
+          'mths_since_recent_bc_dlq',
+          'mths_since_recent_revol_delinq']
+emprestimos.drop(dropar, axis=1, inplace=True)
 #!
 # Verificação de cada feature
 numeros = emprestimos.dtypes[emprestimos.dtypes == 'float64'].index.values
@@ -775,81 +804,111 @@ menores = emprestimos[numeros].isnull().sum()[emprestimos[numeros].isnull().sum(
 # informações registradas então o número é zero
 emprestimos['pub_rec_bankruptcies'] = emprestimos['pub_rec_bankruptcies'].fillna(0)
 #!
-# inq_fi substitui-se NaNs por zero:
+# inq_fi substitui-se NaNs por zero, parte-se do princípio que o tomador não
+# fez requisições sobre finanças pessoais:
 emprestimos['inq_fi'] = emprestimos['inq_fi'].fillna(0)
-
-############################################################################
-
-# acc_now_delinq tem ligação com 'last_pymnt_d' e/ouo 'loan_status'
-
-
-
+#!
 # status 'Fully Paid', 'In Grace Period' e 'Current' tem 0 meses desde último atraso
 # Nota: o tomador pode sim ter inadimplência em outros contratos em outras instituições,
 # mas trabalha-se com informações incompletas aqui
-mask = emprestimos['loan_status'] == ('Fully Paid' or 'In Grace Period' or 'Current')
+mask = emprestimos['loan_status'].isin(['Fully Paid', 'In Grace Period', 'Current'])
 emprestimos.loc[mask, 'mths_since_last_delinq'] = emprestimos.loc[mask, 'mths_since_last_delinq'].fillna(0)
+#!
+# A feature 'mths_since_last_delinq' refere-se à quantidade de meses desde o último atraso.
+# Imputações baseam-se nas informações de 'loan_status':
+# [0] Charged off: 150 dias de atraso
+# [1] Issued: pelo menos 121 dias de atraso
+# [2] Late (31-120 days)
+# [3] In grace period: até 15 dias de atraso (não tem ônus)
+# [4] Does not meet the credit policy. Status: Charged Off': considera-se mesmo prazo do 'charged off'
+# [5] Late (16-30 days)
+# Default: 4 meses (ainda não entrou em charge off, que são 5 meses)
+# 'Does not meet the credit policy. Status:Fully Paid': zero, pois está pago.
+#!
+# [0] Charged Off: 5 meses
+mask = emprestimos['loan_status'] == statuses[0]
+meses = 5
+emprestimos.loc[mask, 'mths_since_last_delinq'] = emprestimos.loc[mask, 'mths_since_last_delinq'].fillna(meses)
+#!
+# [1] Issued: 4 meses
+mask = emprestimos['loan_status'] == statuses[1]
+meses = 4
+emprestimos.loc[mask, 'mths_since_last_delinq'] = emprestimos.loc[mask, 'mths_since_last_delinq'].fillna(meses)
+#!
+# [2] Late (31-120 days): 2 meses
+mask = emprestimos['loan_status'] == statuses[2]
+meses = 2
+emprestimos.loc[mask, 'mths_since_last_delinq'] = emprestimos.loc[mask, 'mths_since_last_delinq'].fillna(meses)
+#!
+# [3] In Grace Period: zero
+mask = emprestimos['loan_status'] == statuses[3]
+emprestimos.loc[mask, 'mths_since_last_delinq'] = emprestimos.loc[mask, 'mths_since_last_delinq'].fillna(0)
+#!
+# [4] Does not meet...: 5 meses
+mask = emprestimos['loan_status'] == statuses[4]
+meses = 5
+emprestimos.loc[mask, 'mths_since_last_delinq'] = emprestimos.loc[mask, 'mths_since_last_delinq'].fillna(meses)
+#!
+# [5] Late (16-30 days): 1 mês
+mask = emprestimos['loan_status'] == statuses[5]
+meses = 1
+emprestimos.loc[mask, 'mths_since_last_delinq'] = emprestimos.loc[mask, 'mths_since_last_delinq'].fillna(meses)
+#!
+# Default: 4 meses
+mask = emprestimos['loan_status'] == 'Default'
+meses = 4
+emprestimos.loc[mask, 'mths_since_last_delinq'] = emprestimos.loc[mask, 'mths_since_last_delinq'].fillna(meses)
+#!
+# 'Does not meet the credit policy. Status:Fully Paid': zero, pois está pago.
+mask = emprestimos['loan_status'] == 'Does not meet the credit policy. Status:Fully Paid'
+emprestimos.loc[mask, 'mths_since_last_delinq'] = emprestimos.loc[mask, 'mths_since_last_delinq'].fillna(0)
+#!
+# Tudo pronto em questão de features, armazenando em disco o dataset ajustado
+emprestimos.to_parquet('data/emprestimos_pronto.parquet')
+#!
+############
+# CARREGAMENTO DOS DADOS JÁ AJUSTADOS E UNIFICAÇÃO
+#=========================
+#!
+#! Carregamento dos arquivos parquet
+emprestimos = pd.read_parquet('data/emprestimos_pronto.parquet')
+hard = pd.read_parquet('data/hardships_pronto.parquet')
+joint = pd.read_parquet('data/joint_ap_pronto.parquet')
+#!
+# União em um único objeto
+emprestimos = pd.concat([emprestimos, hard], axis=1)
+emprestimos = pd.concat([emprestimos, joint], axis=1)
+#!
+# Armazenamento em disco do objeto unificado
+emprestimos.to_parquet('data/emprestimos_wrangled.parquet')
+#!
+#!
 
-mask = emprestimos['mths_since_last_delinq'].isnull()
+############
+# ONE-HOT-ENCODING E ÚLTIMO DROP
+#=========================
+#
+emprestimos = pd.read_parquet('data/emprestimos_wrangled.parquet')  # carrega o arquivo
+emprestimos.drop(['id', 'emp_title'], axis=1, inplace=True)  # dropa duas features sem sentido
+emprestimos = emprestimos.dropna()  # dropa NaNs remanescentes
 
-emprestimos.loc[mask, 'loan_statmths_since_last_delinq']
-
-
-
-emprestimos[['loan_status', 'mths_since_last_delinq']]
-
-#emprestimos[emprestimos.loc[mask]][mask2]
-
-emprestimos.loc[mask, 'loan_status'].value_counts()
-
-
-analise_nans(maiores, emprestimos)
+# earliest_cr_line para data NOVA COLUNA = TEMPO DE TOMADOR
+# last_credit_pull_d para data
+# dropa emp_title
 
 
-emprestimos[menores].head()
+objetos = emprestimos.dtypes[emprestimos.dtypes == 'object'].index.to_list()
+datas = emprestimos.dtypes[emprestimos.dtypes == 'datetime64[ns]'].index.to_list()
+floats = emprestimos.dtypes[emprestimos.dtypes == 'float64'].index.to_list()
+inteiros = emprestimos.dtypes[emprestimos.dtypes == 'int64'].index.to_list()
 
 
-d = datetime.datetime.strptime("2013-03-31", "%Y-%m-%d")
-d2 = d - dateutil.relativedelta.relativedelta(mes_ref)
-print(d2)
+emprestimos[objetos].head()
 
+para_data = ['earliest_cr_line', 'last_credit_pull_d']
+emprestimos[para_data]= pd.to_datetime(emprestimos[para_data], format='%b-%Y')  # reformata de 'object' para data
 
-emprestimos['loan_status']
+emprestimos['issue_d'] = pd.to_datetime(emprestimos['issue_d'], format='%b-%Y')
+mes_ref = emprestimos['last_pymnt_d'].max()  # considera-se o mês mais recente como último pagamento esperado
 
-emprestimos['loan_status'].value_counts().index.to_list()
-
-
-
-
-
-
-
-
-
-
-analise_nans(numeros, emprestimos)
-
-
-
-
-
-
-
-
-
-
-# Verificação das dimensões do dataset limpo
-print(f'Número de observações (linhas): {emprestimos.shape[0]}')  # 2260701
-print(f'Número de features (colunas): {emprestimos.shape[1]}')  # 105
-
-
-
-
-# Grafico das correlações no df completo
-temp = emprestimos.dtypes[emprestimos.dtypes == 'float64'].index.to_list()
-correl = emprestimos[temp].corr()
-sns.heatmap(correl,
-            annot = False,
-            cmap = 'Oranges')
-plt.show()
 
