@@ -1,4 +1,5 @@
 # REFERÊNCIA: FAZER UM MODELO DE CADA ALGORITIMO ESTILO NAIVE - SÓ DROPA TODOS NANS DO DATASET INICIAL. 
+# No naive dropa 'title' e fica apenas com 'purpose'
 #
 import pandas as pd
 from pandas.tseries.offsets import DateOffset
@@ -7,6 +8,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import datetime
 import dateutil.relativedelta
+from sklearn.preprocessing import OneHotEncoder
 pd.set_option('display.max_rows', 250)
 pd.set_option('display.max_columns', None)
 np.set_printoptions(suppress=True, precision=4)
@@ -17,7 +19,6 @@ np.set_printoptions(suppress=True, precision=4)
 #from sklearn.impute import IterativeImputer
 #from sklearn.model_selection import cross_val_score
 #from sklearn.model_selection import train_test_split
-#from sklearn.preprocessing import OneHotEncoder
 #from sklearn import metrics
 #import xgboost as xgb
 #from catboost import CatBoostClassifier
@@ -241,7 +242,8 @@ emprestimos['loan_status'].value_counts()
 # len(emprestimos.isnull().sum()[emprestimos.isnull().sum()/emprestimos.shape[0] > 0.3])
 
 # Dada a alteração na quantidade de variáveis entre 37 e 40% de NaNs, opta-se por eliminar o menor número possível
-# entre essas duas, logo, as features com quantidade de NaNs equivalente a 40% ou mais das observações serão eliminadas
+# entre essas duas, logo, as features com quantidade de NaNs equivalente a 40% ou mais das observações terão
+# atenção maior na tentativa de imputar valores faltantes
 feature_drop = emprestimos.isnull().sum()[emprestimos.isnull().sum()/emprestimos.shape[0] > 0.3].index.values
 
 # Análise individual de cada uma dessas features
@@ -354,6 +356,9 @@ hardships.loc[mask, 'hardship_reason'] = 'FAMILY_DEATH'
 for i in range(0, len(lista)):
     hardships[lista[i]] = hardships[lista[i]].str.lower()
 #!
+# Salva alterações em disco
+#hardships.to_parquet('data/hardwhips_wrangled.parquet')
+#!
 #!
 ############
 # DATA WRANGLING: TRATAMENTO DOS CONTRATOS COM APLICAÇÃO CONJUNTA
@@ -439,12 +444,14 @@ joint_ap.loc[vazios, lista[1]] = emprestimos.loc[vazios, 'fico_range_high']  # r
 # quantidade de recuperações de dívidas, hipotecas, etc., do segundo proponente. NaNs preenchidos com zero:
 zeros = joint_ap.isnull().sum()[joint_ap.isnull().sum() > 53].index.to_list()
 joint_ap[zeros] = joint_ap[zeros].fillna(0)
-
+#!
+# Salva alterações em disco
+#joint_ap.to_parquet('data/joint_ap_wrangled.parquet')
 
 ############
 # DATA WRANGLING: TRATAMENTO DAS DEMAIS FEATURES CATEGÓRICAS
 #=========================
-emprestimos = pd.read_parquet('data/emprestimos_dropado.parquet')
+#emprestimos = pd.read_parquet('data/emprestimos_dropado.parquet')
 dropar = ['Unnamed: 0', 'url', 'zip_code']  # features sem utilização no contexto deste estudo
 emprestimos.drop(dropar, axis=1, inplace=True)
 #!
@@ -863,52 +870,92 @@ emprestimos.loc[mask, 'mths_since_last_delinq'] = emprestimos.loc[mask, 'mths_si
 mask = emprestimos['loan_status'] == 'Does not meet the credit policy. Status:Fully Paid'
 emprestimos.loc[mask, 'mths_since_last_delinq'] = emprestimos.loc[mask, 'mths_since_last_delinq'].fillna(0)
 #!
+# Reformata as observações apropriadas de object para data
+emprestimos['last_credit_pull_d']= pd.to_datetime(emprestimos['last_credit_pull_d'], format='%b-%Y')  # reformata de 'object' para data
+emprestimos['earliest_cr_line']= pd.to_datetime(emprestimos['earliest_cr_line'], format='%b-%Y')  # reformata de 'object' para data
+#!
+# Criação de nova variável que considera o tempo total de experiência com empréstimos
+# do proponente
+anos = (emprestimos['issue_d'].dt.year - emprestimos['earliest_cr_line'].dt.year)*12
+meses = emprestimos['issue_d'].dt.month - emprestimos['earliest_cr_line'].dt.month
+tempo_tomador = anos + meses
+emprestimos['tempo_total_tomador'] = tempo_tomador
+#!
 # Tudo pronto em questão de features, armazenando em disco o dataset ajustado
-emprestimos.to_parquet('data/emprestimos_pronto.parquet')
+#emprestimos.to_parquet('data/emprestimos_wrangled.parquet')
+#!
 #!
 ############
 # CARREGAMENTO DOS DADOS JÁ AJUSTADOS E UNIFICAÇÃO
 #=========================
 #!
 #! Carregamento dos arquivos parquet
-emprestimos = pd.read_parquet('data/emprestimos_pronto.parquet')
-hard = pd.read_parquet('data/hardships_pronto.parquet')
-joint = pd.read_parquet('data/joint_ap_pronto.parquet')
+emprestimos = pd.read_parquet('data/emprestimos_wrangled.parquet')
+hard = pd.read_parquet('data/hardships_wrangled.parquet')
+joint = pd.read_parquet('data/joint_ap_wrangled.parquet')
+emprestimos.drop(hard.columns.to_list(), axis=1, inplace=True)
+emprestimos.drop(joint.columns.to_list(), axis=1, inplace=True)
 #!
 # União em um único objeto
 emprestimos = pd.concat([emprestimos, hard], axis=1)
 emprestimos = pd.concat([emprestimos, joint], axis=1)
 #!
 # Armazenamento em disco do objeto unificado
-emprestimos.to_parquet('data/emprestimos_wrangled.parquet')
-#!
-#!
+#emprestimos.to_parquet('data/emprestimos_wrangled_unificado.parquet')
+
 
 ############
-# ONE-HOT-ENCODING E ÚLTIMO DROP
+# DEFINIÇÃO DO TARGET, ONE-HOT-ENCODING E DROPS FINAIS
 #=========================
-#
-emprestimos = pd.read_parquet('data/emprestimos_wrangled.parquet')  # carrega o arquivo
+#!
+emprestimos = pd.read_parquet('data/emprestimos_wrangled_unificado.parquet')  # carrega o arquivo
 emprestimos.drop(['id', 'emp_title'], axis=1, inplace=True)  # dropa duas features sem sentido
 emprestimos = emprestimos.dropna()  # dropa NaNs remanescentes
 
-# earliest_cr_line para data NOVA COLUNA = TEMPO DE TOMADOR
-# last_credit_pull_d para data
-# dropa emp_title
+
+
+
+# O objetivo do estudo proposto é estimar a probabilidade de um contrato não ser pago,
+# então considera-se como 'não pago' todo empréstimo que ficar em atraso acima de
+# 120 dias, quando então será enquadrado como inadimplido e registrado como
+# prejuízo no devido tempo
+emprestimos['loan_status'].value_counts()
+
+inad = ['Charged Off', 'Issued', 'Default']
+temp = ['Fully Paid', 'Current', 'Late (31-120 days)', 'In Grace Period', 'Late (16-30 days)']
+
+emprestimos['loan_status'].value_counts().index.to_list()
+
+
+
+
+
+
+
+
 
 
 objetos = emprestimos.dtypes[emprestimos.dtypes == 'object'].index.to_list()
-datas = emprestimos.dtypes[emprestimos.dtypes == 'datetime64[ns]'].index.to_list()
-floats = emprestimos.dtypes[emprestimos.dtypes == 'float64'].index.to_list()
-inteiros = emprestimos.dtypes[emprestimos.dtypes == 'int64'].index.to_list()
+#!
+ohe = OneHotEncoder(drop='first',
+                    sparse_output=False).set_output(transform='pandas')
+#!
+# Fit do OHE feito em etapas em função de limitação de memória RAM
+emprestimos_ohe1 = ohe.fit_transform(emprestimos[objetos[0:6]])
+#emprestimos_ohe1.to_parquet('data/emprestimos_ohe1.parquet')  # salva em disco
+emprestimos_ohe2 = ohe.fit_transform(emprestimos[objetos[7:12]])
+#emprestimos_ohe2.to_parquet('data/emprestimos_ohe2.parquet')  # salva em disco
+#!
+emprestimos_ohe = pd.concat([emprestimos_ohe, emprestimos_ohe2], axis=1)
+emprestimos = emprestimos.drop(objetos, axis=1)
+emprestimos_ohe = pd.read_parquet('data/emprestimos_ohe.parquet')
+emprestimos = pd.concat([emprestimos, emprestimos_ohe], axis=1)
 
 
-emprestimos[objetos].head()
+############
+# CRIAÇÃO E TREINO DOS MODELOS
+#=========================
+#!
+emprestimos = pd.read_parquet('data/emprestimos_pronto.parquet')
 
-para_data = ['earliest_cr_line', 'last_credit_pull_d']
-emprestimos[para_data]= pd.to_datetime(emprestimos[para_data], format='%b-%Y')  # reformata de 'object' para data
-
-emprestimos['issue_d'] = pd.to_datetime(emprestimos['issue_d'], format='%b-%Y')
-mes_ref = emprestimos['last_pymnt_d'].max()  # considera-se o mês mais recente como último pagamento esperado
-
-
+######## Modelo XGBoost
