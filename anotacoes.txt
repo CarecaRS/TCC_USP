@@ -8,10 +8,10 @@ Banco de dados:
 #Refere-se aos empréstimos cedidos pelo Lending Club (EUA), de 2007 até 2018Q4.
 
 **2- https://www.kaggle.com/datasets/ethon0426/lending-club-20072020q1/data**
-Refere-se aos empréstimos cedidos pelo Lending Club (EUA), de 2007 até 2020Q1. Tem ao redor de 700mil observações adicionais, ao custo de 9 features a menos.
+Refere-se aos empréstimos cedidos pelo Lending Club (EUA), de 2007 até 2020Q4. Tem ao redor de 700mil observações adicionais, ao custo de 9 features a menos.
 
 Informações sobre as features:
-https://www.kaggle.com/datasets/imsparsh/lending-club-loan-dataset-2007-2011
+https://www.rdocumentation.org/packages/creditmodel/versions/1.0/topics/lendingclub
 
 Informações econômicas:
 Como taxa de juros de referência será utilizada a Effective Federal Funds Rate:
@@ -44,7 +44,8 @@ Explica o que é taxa básica de juros, explica o que é o FED.
 
 Em relação aos lags da taxa de juros: eu não consegui encontrar histórico de projeções
 da taxa básica de juros anterior a 2020, então será usada a taxa real futura mais um
-ruído aleatório de até 0.5pp
+ruído aleatório de até 0.5pp. Certificar que o rúido de longo prazo tem uma variância
+maior do que o ruído de curto prazo.
 
 A feature 'home_ownership' possui classes 'ANY' e 'OTHER', além dos enquadramentos certos. De repente juntar essas duas pode ser algo útil.
 A feature 'loan_status' tem duas categorizações específicas que pode-se testar unindo elas às categorias gerais e também dropar.
