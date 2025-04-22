@@ -60,9 +60,9 @@ def separa_datas(df, col):
         for i in range(0, len(temp)):  # preenche a lista com mês e ano
             mes_ano.append(temp.loc[i, col].strftime('%b-%Y').lower())
         #
-        print('\nGerando nova série ajustada.')
+        print('\nTudo pronto.')
         #
-        return pd.Series(data=mes_ano, name=col)  # retorna uma série nova
+        return pd.Series(data=mes_ano, name='mes_ano')  # retorna uma série nova
 #!
 #!
 # Função para buscar a explicação de cada feature no dicionário e analisar NaNs
@@ -134,61 +134,6 @@ def analise_nans(lista, dataframe: pd.DataFrame):
             print(f'Quantidade total de NaNs: {dataframe[lista[0]].isnull().sum()}')
             print(f'Proporção desses NaNs: {round((dataframe[lista[0]].isnull().sum()/len(dataframe))*100, 2)}%')
 
-
-
-############
-# DATA WRANGLING: TAXAS DE JUROS
-#=========================
-
-# Tratamento do arquivo com as taxas de juros
-effr = pd.read_csv('./data/EFFR.csv')
-effr['observation_date'] = pd.to_datetime(effr['observation_date'])  # transforma a informação de cronologia de object para datas
-#!
-mask_pos = effr['observation_date'] >= '2021-09-01'  # seleciona as datas até 2021Q3
-mask_pre = effr['observation_date'] <= '2005-12-31'  # seleciona as dadas pré ano de 2006
-dropar = np.array(effr[mask_pos | mask_pre].index)  # filtra os índices referente a essas datas em um array
-effr = effr.drop(dropar).dropna().reset_index(drop=True)  # dropa as datas selecionadas e elimina NaNs (dias como Natal e Ano-Novo, por exemplo), refazendo o índice
-#!
-datas = separa_datas(effr, 'observation_date')
-taxas = effr['EFFR']  # isola as taxas de juros
-effr = pd.concat([datas, taxas], axis=1)
-#!
-# O registro da concessão dos empréstimos contém informação apenas de mês/ano do contrato, não da data em que foi feito. Para utilização
-# de taxa de juros vigente bem como taxa futura esperada, será utilizada a média das taxas reais praticadas em cada respectivo mês.
-effr = effr.groupby(['mes_ano'])['EFFR'].mean().reset_index()  # agrega as informações por mês, informando a média
-effr['mes_ano'] = pd.to_datetime(effr['mes_ano'], format='%b-%Y')  # manipulação de object para data
-effr = effr.sort_values(by='mes_ano').reset_index(drop=True)  # ordena em função da data
-effr['mes_ano'] = separa_datas(effr, 'mes_ano')  # faz o ajuste de mês e ano novamente
-#!
-# O ruído é baseado nos últimos 6 períodos para a expectativa futura de 6 meses e
-# baseado nos últimos 12 períodos para a expectativa futura de 12 meses
-expec_6m = effr['EFFR'].rolling(7).mean().dropna().reset_index(drop=True)  # desloca as observações 6 períodos à frente
-expec_12m = effr['EFFR'].rolling(13).mean().dropna().reset_index(drop=True)  # desloca 12 períodos
-#!
-# Criação das expectativas futuras das taxas de juros com adição de ruído.
-desvio = 0.5  # meio ponto percentual a.a.
-#!
-ruido_6m = []
-for i in range(0,len(expec_6m)):
-    temp = np.random.normal(expec_6m[i], desvio)  # gera um ruído aleatório ao redor da taxa real utilizando o desvio estabelecido
-    ruido_6m.append(temp)
-expec_6m = abs(pd.Series(ruido_6m, name='expec6m'))  # utiliza valores em módulo, não existem juros negativos na prática
-#!
-ruido_12m = []
-for i in range(0,len(expec_12m)):
-    temp = np.random.normal(expec_12m[i], desvio)
-    ruido_12m.append(temp)
-expec_12m = abs(pd.Series(ruido_12m, name='expec12m'))
-#!
-# Une as expectativas de taxas em um único dataframe
-expectativas = pd.concat([expec_6m, expec_12m], axis=1)
-#!
-# E une o dataframe original
-effr = pd.concat([effr, expectativas], axis=1)
-#!
-# Com as manipulações já feitas, seleciona-se apenas o período compreendido pelo
-# banco de dados contendo as informações dos contratos (2007 a 2018)
-effr = effr.drop(range(0,12)).dropna().reset_index(drop=True)
 
 
 ############
@@ -451,7 +396,7 @@ joint_ap[zeros] = joint_ap[zeros].fillna(0)
 ############
 # DATA WRANGLING: TRATAMENTO DAS DEMAIS FEATURES CATEGÓRICAS
 #=========================
-#emprestimos = pd.read_parquet('data/emprestimos_dropado.parquet')
+emprestimos = pd.read_parquet('data/emprestimos_dropado.parquet')
 dropar = ['Unnamed: 0', 'url', 'zip_code']  # features sem utilização no contexto deste estudo
 emprestimos.drop(dropar, axis=1, inplace=True)
 #!
@@ -619,7 +564,7 @@ for obs in nomes.to_list():
         casa_compra.append(obs)
 # Substituindo os valores como relacao[2]
 for obs in pd.Series(casa_compra).unique():
-    mask = nomes == obs
+mask = nomes == obs
     nomes.loc[mask] = 'Real Estate'
 #!
 # Quarta etapa, relativo a empresas e empreendimentos
@@ -881,7 +826,16 @@ meses = emprestimos['issue_d'].dt.month - emprestimos['earliest_cr_line'].dt.mon
 tempo_tomador = anos + meses
 emprestimos['tempo_total_tomador'] = tempo_tomador
 #!
-# Tudo pronto em questão de features, armazenando em disco o dataset ajustado
+# Criação de nova variável que considera o tempo desde a última consulta ao score do proponente
+anos = (emprestimos['issue_d'].dt.year - emprestimos['last_credit_pull_d'].dt.year)*12
+meses = emprestimos['issue_d'].dt.month - emprestimos['last_credit_pull_d'].dt.month
+consulta_score = anos + meses
+emprestimos['tempo_consulta'] = consulta_score
+#!
+# Tudo pronto em questão de features, dropa-se as features que já cumpriram seu papel 
+# e armazena-se em disco o dataset ajustado
+dropar = ['last_pymnt_d', 'last_credit_pull_d', 'earliest_cr_line']
+emprestimos.drop(dropar, axis=1, inplace=True)
 #emprestimos.to_parquet('data/emprestimos_wrangled.parquet')
 #!
 #!
@@ -893,61 +847,122 @@ emprestimos['tempo_total_tomador'] = tempo_tomador
 emprestimos = pd.read_parquet('data/emprestimos_wrangled.parquet')
 hard = pd.read_parquet('data/hardships_wrangled.parquet')
 joint = pd.read_parquet('data/joint_ap_wrangled.parquet')
-emprestimos.drop(hard.columns.to_list(), axis=1, inplace=True)
-emprestimos.drop(joint.columns.to_list(), axis=1, inplace=True)
 #!
 # União em um único objeto
 emprestimos = pd.concat([emprestimos, hard], axis=1)
 emprestimos = pd.concat([emprestimos, joint], axis=1)
 #!
 # Armazenamento em disco do objeto unificado
-#emprestimos.to_parquet('data/emprestimos_wrangled_unificado.parquet')
+emprestimos.to_parquet('data/emprestimos_wrangled_unificado.parquet')
 
 
 ############
-# DEFINIÇÃO DO TARGET, ONE-HOT-ENCODING E DROPS FINAIS
+# DEFINIÇÃO DO TARGET, INCLUSÃO DAS TAXAS DE JUROS, ONE-HOT-ENCODING E DROPS FINAIS
 #=========================
 #!
 emprestimos = pd.read_parquet('data/emprestimos_wrangled_unificado.parquet')  # carrega o arquivo
-emprestimos.drop(['id', 'emp_title'], axis=1, inplace=True)  # dropa duas features sem sentido
+emprestimos.drop(['id', 'emp_title', 'next_pymnt_d'], axis=1, inplace=True)  # dropa features sem sentido
 emprestimos = emprestimos.dropna()  # dropa NaNs remanescentes
-
-
-
-
+#!
 # O objetivo do estudo proposto é estimar a probabilidade de um contrato não ser pago,
 # então considera-se como 'não pago' todo empréstimo que ficar em atraso acima de
-# 120 dias, quando então será enquadrado como inadimplido e registrado como
-# prejuízo no devido tempo
-emprestimos['loan_status'].value_counts()
+# 120 dias, quando então será considerado inadimplido e registrado como prejuízo no
+# devido tempo
+emprestimos['loan_status'].value_counts()  # apenas para checar os status possíveis
+#!
+inad = ['Charged Off', 'Issued', 'Default']  # cria uma lista com os status não-pagos
+#!
+# Criação do target ('default'):
+mask = emprestimos['loan_status'].isin(inad)  # máscara para identificação dos contratos não-pagos
+emprestimos['default'] = 0  # criação da feature de target
+emprestimos.loc[mask, 'default'] = 1  # registro dos contratos não-pagos
+#!
 
-inad = ['Charged Off', 'Issued', 'Default']
-temp = ['Fully Paid', 'Current', 'Late (31-120 days)', 'In Grace Period', 'Late (16-30 days)']
+# Inclusão das taxas de juros
+# Tratamento do arquivo com as taxas de juros
+effr = pd.read_csv('./data/EFFR.csv')
+effr['observation_date'] = pd.to_datetime(effr['observation_date'])  # transforma a informação de cronologia de object para datas
+#!
+mask_pos = effr['observation_date'] >= '2021-10-01'  # seleciona as datas até 2021Q3
+mask_pre = effr['observation_date'] <= '2011-07-31'  # seleciona as dadas pré ano de 2012
+dropar = np.array(effr[mask_pos | mask_pre].index)  # filtra os índices referente a essas datas em um array
+effr = effr.drop(dropar).dropna().reset_index(drop=True)  # dropa as datas selecionadas e elimina NaNs (dias como Natal e Ano-Novo, por exemplo), refazendo o índice
+#!
+datas = separa_datas(effr, 'observation_date')
+taxas = effr['EFFR']  # isola as taxas de juros
+effr = pd.concat([datas, taxas], axis=1)
+#!
+# O registro da concessão dos empréstimos contém informação apenas de mês/ano do contrato, não da data em que foi feito. Para utilização
+# de taxa de juros vigente bem como taxa futura esperada, será utilizada a média das taxas reais praticadas em cada mês.
+effr = effr.groupby(['mes_ano'])['EFFR'].mean().reset_index()  # agrega as informações por mês, informando a média
+effr['mes_ano'] = pd.to_datetime(effr['mes_ano'], format='%b-%Y')  # manipulação de object para data
+effr = effr.sort_values(by='mes_ano').reset_index(drop=True)  # ordena em função da data
+effr['mes_ano'] = separa_datas(effr, 'mes_ano')  # faz o ajuste de mês e ano novamente
+#!
+# O ruído é baseado nos últimos 6 períodos para a expectativa futura de 6 meses e
+# baseado nos últimos 12 períodos para a expectativa futura de 12 meses
+expec_6m = effr['EFFR'].rolling(7).mean().dropna().reset_index(drop=True)  # desloca as observações 6 períodos à frente
+expec_12m = effr['EFFR'].rolling(13).mean().dropna().reset_index(drop=True)  # desloca 12 períodos
+#!
+# Criação das expectativas futuras das taxas de juros com adição de ruído.
+desvio = 0.01  # pequeno ruído a se criar (ponto percentual ao ano)
+#!
+ruido_6m = []
+for i in range(0,len(expec_6m)):
+    temp = np.random.normal(loc=expec_6m[i], scale=desvio)  # gera um ruído aleatório ao redor da taxa real utilizando o desvio estabelecido
+    ruido_6m.append(temp)
+expec_6m = abs(pd.Series(ruido_6m, name='expec6m'))  # utiliza valores em módulo, não existem juros negativos na prática
+#!
+ruido_12m = []
+for i in range(0,len(expec_12m)):
+    temp = np.random.normal(loc=expec_12m[i], scale=desvio)
+    ruido_12m.append(temp)
+expec_12m = abs(pd.Series(ruido_12m, name='expec12m'))
+#!
+# Une as expectativas de taxas em um único dataframe
+expectativas = pd.concat([expec_6m, expec_12m], axis=1)
+#!
+# E une o dataframe original
+effr = pd.concat([effr, expectativas], axis=1)
+#!
+# Com as manipulações já feitas, seleciona-se apenas o período compreendido pelo
+# banco de dados contendo as informações dos contratos (2007 a 2018)
+effr = effr.drop(range(0,12)).dropna().reset_index(drop=True)
+#!
+# Para finalizar, transforma a coluna de datas de formato 'object' para data
+effr['mes_ano'] = pd.to_datetime(effr['mes_ano'], format='%b-%Y')
+#!
+# Une as taxas de juros ao dataset dos contratos
+emprestimos = pd.merge(right=emprestimos, left=effr, right_on='issue_d', left_on='mes_ano')
+#!
+# Dropa festures que já cumpriram seu propósito
+dropar = ['mes_ano', 'issue_d' ]
+emprestimos.drop(dropar, axis=1, inplace=True)
+emprestimos.to_parquet('data/emprestimos_pre_ohe.parquet')
 
-emprestimos['loan_status'].value_counts().index.to_list()
-
-
-
-
-
-
-
-
-
-
+# One Hot Encoding
+emprestimos = pd.read_parquet('data/emprestimos_pre_ohe.parquet')
 objetos = emprestimos.dtypes[emprestimos.dtypes == 'object'].index.to_list()
 #!
 ohe = OneHotEncoder(drop='first',
                     sparse_output=False).set_output(transform='pandas')
 #!
+
 # Fit do OHE feito em etapas em função de limitação de memória RAM
-emprestimos_ohe1 = ohe.fit_transform(emprestimos[objetos[0:6]])
+emprestimos_ohe1 = ohe.fit_transform(emprestimos[objetos[0:11]])
 #emprestimos_ohe1.to_parquet('data/emprestimos_ohe1.parquet')  # salva em disco
-emprestimos_ohe2 = ohe.fit_transform(emprestimos[objetos[7:12]])
+#!
+emprestimos_ohe2 = ohe.fit_transform(emprestimos[objetos[12:22]])
 #emprestimos_ohe2.to_parquet('data/emprestimos_ohe2.parquet')  # salva em disco
 #!
-emprestimos_ohe = pd.concat([emprestimos_ohe, emprestimos_ohe2], axis=1)
+
+emprestimos_ohe1 = pd.read_parquet('data/emprestimos_ohe1.parquet')
+emprestimos_ohe2 = pd.read_parquet('data/emprestimos_ohe2.parquet')
+emprestimos_ohe = pd.concat([emprestimos_ohe1, emprestimos_ohe2], axis=1)
+#emprestimos_ohe.to_parquet('data/emprestimos_ohe.parquet')
+
 emprestimos = emprestimos.drop(objetos, axis=1)
+
 emprestimos_ohe = pd.read_parquet('data/emprestimos_ohe.parquet')
 emprestimos = pd.concat([emprestimos, emprestimos_ohe], axis=1)
 
@@ -957,5 +972,12 @@ emprestimos = pd.concat([emprestimos, emprestimos_ohe], axis=1)
 #=========================
 #!
 emprestimos = pd.read_parquet('data/emprestimos_pronto.parquet')
+
+
+emprestimos.columns.to_list()
+
+emprestimos.info()
+
+emprestimos['issue_d']
 
 ######## Modelo XGBoost
