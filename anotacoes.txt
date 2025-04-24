@@ -60,7 +60,8 @@ A feature 'desc' tem alguns registros de consolidação de dívida, de repente v
 Devo ter pulado alguns, mas 'hardship_type' preenche com 'None'
 'hardship_start_date' e end_date pode ter alguma relação, para prazos maiores a exposição ao risco aumenta, aumentando a probabilidade de inadimplência.
 
-De repente dá para fazer duas análises de inadimplência. Uma com os clientes regulares e outra com os clientes que fizeram acordo de renegociação (hardship settlement)
+De repente dá para fazer duas análises de inadimplência. Uma com os clientes regulares e outra com os clientes que fizeram acordo de renegociação (hardship settlement). Neste ponto em específico eu já começo a pensar que tudo fica no mesmo balaio. O cliente chega pela primeira vez, certo? É rodada uma análise de crédito e de viabilidade/precificação da proposta que o cliente traz, é aprovado. O status dessa proposta é o target do estudo, se inadimpliu ou não. Se esse mesmo cliente atrasa e faz uma renegociação, é refeita a análise de crédito desse cliente e re-precificado tudo, o status dessa próxima renegociação passa a ser o novo target do contrato, pois agora o que pode atrasar (ou não) é a renegociação.
+
 
 
 INTRODUÇÃO: O que é o risco de inadimplência, como se pode estimar, de repente alguma pincelada em crises econômicas recentes (deixa a nível mundial eu acho, ou separa Brasil x Resto do Mundo, pensando nas publicações internas/gringas), métodos normalmente utilizados para esse cálculo. O que são redes neurais, conceito de deep learning. Explicar matriz de confusão e a importância dela nessas análises.
