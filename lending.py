@@ -203,7 +203,6 @@ for hardship in emprestimos.columns.to_list():
     if "hardship" in hardship:
         hard_cols.append(hardship)
 #!
-#!
 # Seleção das features de aplicação conjunta (15 variáveis)
 sep_ap = []
 for other_applicant in emprestimos.columns.to_list():
@@ -301,8 +300,42 @@ hardships.loc[mask, 'hardship_reason'] = 'FAMILY_DEATH'
 for i in range(0, len(lista)):
     hardships[lista[i]] = hardships[lista[i]].str.lower()
 #!
+# Quando realizada a renegociação, o status dessa renegociação é que passará a ser o target do modelo
+# São consideradas operações inadimplidas as com status 'incollection' (terceirizada),
+# 'delinquent' (inadimplente), e 'issued' (registrada como inadimplida rumo a prejuízo)                                                                                         
+inad = ['incollection', 'delinquent', 'issued']
+# Criação do target:
+mask = hardships['hardship_loan_status'].isin(inad)  # máscara para identificação dos contratos não-pagos
+hardships['hardship_default'] = 0  # criação da feature de target
+hardships.loc[mask, 'hardship_default'] = 1  # registro dos contratos não-pagos
+hardships.drop('hardship_loan_status', axis=1, inplace=True)  # dropa a variável referência do target
+#!
+# Para a criação de novas variáveis contemplando os prazos de renegociação primeiro
+# precisa-se transformar as features de base em datetime[ns], para tanto os valores
+# 'not applicable' serão substituídos pelo mês 'jan-2125' apenas como facilitador do cálculo
+# para depois ajustar esses valores corretamente
+feats = ['hardship_end_date', 'hardship_start_date', 'payment_plan_start_date']
+for feat in feats:
+    mask = hardships[feat] == 'not applicable'
+    hardships.loc[mask, feat] = 'jan-2125'
+    hardships[feat] = pd.to_datetime(hardships[feat], format='%b-%Y')
+#!
+# Criação de nova feature com o tempo total do contrato de renegociação
+anos = (hardships['hardship_end_date'].dt.year - hardships['hardship_start_date'].dt.year)*12
+meses = hardships['hardship_end_date'].dt.month - hardships['hardship_start_date'].dt.month
+tempo_contrato = anos + meses
+hardships['tempo_total_contrato'] = tempo_contrato
+#!
+# Criação de nova feature, de tempo total de de payment_plan
+anos = (hardships['hardship_end_date'].dt.year - hardships['payment_plan_start_date'].dt.year)*12
+meses = hardships['hardship_end_date'].dt.month - hardships['payment_plan_start_date'].dt.month
+tempo_payment = anos + meses
+hardships['tempo_payment_plan'] = tempo_payment
+# Colunas de data já utilizadas, pode-se dropar
+hardships.drop(feats, axis=1, inplace=True)
+#!
 # Salva alterações em disco
-#hardships.to_parquet('data/hardwhips_wrangled.parquet')
+#hardships.to_parquet('data/hardships_wrangled.parquet')
 #!
 #!
 ############
@@ -853,7 +886,7 @@ emprestimos = pd.concat([emprestimos, hard], axis=1)
 emprestimos = pd.concat([emprestimos, joint], axis=1)
 #!
 # Armazenamento em disco do objeto unificado
-emprestimos.to_parquet('data/emprestimos_wrangled_unificado.parquet')
+#emprestimos.to_parquet('data/emprestimos_wrangled_unificado.parquet')
 
 
 ############
@@ -861,14 +894,14 @@ emprestimos.to_parquet('data/emprestimos_wrangled_unificado.parquet')
 #=========================
 #!
 emprestimos = pd.read_parquet('data/emprestimos_wrangled_unificado.parquet')  # carrega o arquivo
-emprestimos.drop(['id', 'emp_title', 'next_pymnt_d'], axis=1, inplace=True)  # dropa features sem sentido
+emprestimos.drop(['id', 'emp_title', 'next_pymnt_d'], axis=1, inplace=True)  # dropa features agora sem sentido
 emprestimos = emprestimos.dropna()  # dropa NaNs remanescentes
 #!
 # O objetivo do estudo proposto é estimar a probabilidade de um contrato não ser pago,
 # então considera-se como 'não pago' todo empréstimo que ficar em atraso acima de
 # 120 dias, quando então será considerado inadimplido e registrado como prejuízo no
 # devido tempo
-emprestimos['loan_status'].value_counts()  # apenas para checar os status possíveis
+#emprestimos['loan_status'].value_counts()  # apenas para checar os status possíveis
 #!
 inad = ['Charged Off', 'Issued', 'Default']  # cria uma lista com os status não-pagos
 #!
@@ -877,7 +910,12 @@ mask = emprestimos['loan_status'].isin(inad)  # máscara para identificação do
 emprestimos['default'] = 0  # criação da feature de target
 emprestimos.loc[mask, 'default'] = 1  # registro dos contratos não-pagos
 #!
-
+# Registra em 'default' a inadimplência existente seja em contrato regular ou em renegociação,
+# dropando a inadimplência específica da renegociação
+emprestimos['default'] = emprestimos[['default', 'hardship_default']].max(axis=1)
+emprestimos.drop('hardship_default', axis=1, inplace=True)
+#!
+#!
 # Inclusão das taxas de juros
 # Tratamento do arquivo com as taxas de juros
 effr = pd.read_csv('./data/EFFR.csv')
@@ -939,32 +977,31 @@ emprestimos = pd.merge(right=emprestimos, left=effr, right_on='issue_d', left_on
 dropar = ['mes_ano', 'issue_d' ]
 emprestimos.drop(dropar, axis=1, inplace=True)
 emprestimos.to_parquet('data/emprestimos_pre_ohe.parquet')
-
+#!
+#!
 # One Hot Encoding
 emprestimos = pd.read_parquet('data/emprestimos_pre_ohe.parquet')
 objetos = emprestimos.dtypes[emprestimos.dtypes == 'object'].index.to_list()
 #!
+"""
 ohe = OneHotEncoder(drop='first',
                     sparse_output=False).set_output(transform='pandas')
 #!
-
 # Fit do OHE feito em etapas em função de limitação de memória RAM
-emprestimos_ohe1 = ohe.fit_transform(emprestimos[objetos[0:11]])
+emprestimos_ohe1 = ohe.fit_transform(emprestimos[objetos[0:10]])
 #emprestimos_ohe1.to_parquet('data/emprestimos_ohe1.parquet')  # salva em disco
 #!
-emprestimos_ohe2 = ohe.fit_transform(emprestimos[objetos[12:22]])
+emprestimos_ohe2 = ohe.fit_transform(emprestimos[objetos[11:18]])
 #emprestimos_ohe2.to_parquet('data/emprestimos_ohe2.parquet')  # salva em disco
 #!
-
-emprestimos_ohe1 = pd.read_parquet('data/emprestimos_ohe1.parquet')
-emprestimos_ohe2 = pd.read_parquet('data/emprestimos_ohe2.parquet')
 emprestimos_ohe = pd.concat([emprestimos_ohe1, emprestimos_ohe2], axis=1)
-#emprestimos_ohe.to_parquet('data/emprestimos_ohe.parquet')
-
-emprestimos = emprestimos.drop(objetos, axis=1)
-
-emprestimos_ohe = pd.read_parquet('data/emprestimos_ohe.parquet')
-emprestimos = pd.concat([emprestimos, emprestimos_ohe], axis=1)
+emprestimos_ohe.to_parquet('data/emprestimos_ohe.parquet')
+"""
+#!
+emprestimos_ohe = pd.read_parquet('data/emprestimos_ohe.parquet')  # carrega as features OHE
+emprestimos = emprestimos.drop(objetos, axis=1)  # dropa as colunas já utilizadas para OHE
+emprestimos = pd.concat([emprestimos, emprestimos_ohe], axis=1)  # une os dataframes
+#emprestimos.to_parquet('data/emprestimos_pronto.parquet')
 
 
 ############
@@ -973,10 +1010,10 @@ emprestimos = pd.concat([emprestimos, emprestimos_ohe], axis=1)
 #!
 emprestimos = pd.read_parquet('data/emprestimos_pronto.parquet')
 
+emprestimos.drop(hard.columns.to_list(), axis=1, inplace=True)
 
 emprestimos.columns.to_list()
 
-emprestimos.info()
 
 emprestimos['issue_d']
 
