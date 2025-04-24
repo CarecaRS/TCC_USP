@@ -9,20 +9,16 @@ import seaborn as sns
 import datetime
 import dateutil.relativedelta
 from sklearn.preprocessing import OneHotEncoder
+from sklearn.model_selection import cross_val_score, train_test_split
+from sklearn.metrics import r2_score, log_loss
+import xgboost as xgb
+from catboost import CatBoostClassifier
+from lightgbm import LGBMClassifier
+#from sklearn import metrics
 pd.set_option('display.max_rows', 250)
 pd.set_option('display.max_columns', None)
 np.set_printoptions(suppress=True, precision=4)
 %autoindent OFF 
-#!
-#from sklearn.metrics import r2_score, log_loss
-#from sklearn.experimental import enable_iterative_imputer
-#from sklearn.impute import IterativeImputer
-#from sklearn.model_selection import cross_val_score
-#from sklearn.model_selection import train_test_split
-#from sklearn import metrics
-#import xgboost as xgb
-#from catboost import CatBoostClassifier
-#from lightgbm import LGBMClassifier
 #!
 #!
 ############
@@ -1005,16 +1001,101 @@ emprestimos = pd.concat([emprestimos, emprestimos_ohe], axis=1)  # une os datafr
 
 
 ############
-# CRIAÇÃO E TREINO DOS MODELOS
+# SEPARAÇÃO DAS OBSERVAÇÕES PARA VALIDAÇÃO E MODELAGEM
 #=========================
 #!
 emprestimos = pd.read_parquet('data/emprestimos_pronto.parquet')
+# O dataset possui uma variável que tem um caractere inválido no nome da coluna, o erro
+# foi identificado na hora da modelagem mas é corrigido aqui
+errado = 'emp_length_< 1 year'
+emprestimos['emp_length_upto_1_year'] = emprestimos[errado]
+emprestimos.drop(errado, axis=1, inplace=True)
+#!
+# O banco de dados original é separado em duas partes, uma que servirá para
+# validação do modelo (15% do total) e outra que será utilizada para a modelagem
+# propriamente dita.
+modelagem, validacao = train_test_split(emprestimos, test_size=0.15, random_state=1)
+#!
+# Verifica se as proporções do target são congruentes
+modelagem['default'].value_counts(normalize=True)
+validacao['default'].value_counts(normalize=True)
+#!
+# Salva os banco de dados segregados em disco
+modelagem.to_parquet('data/modelagem.parquet')
+validacao.to_parquet('data/validacao.parquet')
 
-emprestimos.drop(hard.columns.to_list(), axis=1, inplace=True)
 
-emprestimos.columns.to_list()
+############
+# CRIAÇÃO E TREINO DOS MODELOS
+#=========================
+#!
+# Carregamento inicial do banco de dados para treino e teste
+modelagem = pd.read_parquet('data/modelagem.parquet')
+#!
+# Definição das variáveis dependente e independentes, salvando em disco
+target = ['default']
+test_data = modelagem[target]
+train_data = modelagem.drop(target, axis = 1)
+#!
+test_data.to_parquet('data/test_data.parquet')
+train_data.to_parquet('data/train_data.parquet')
+
+#!
+# Com os dados salvos, carrega-se apenas os datasets já ajustados
+train_data = pd.read_parquet('data/train_data.parquet')
+test_data = pd.read_parquet('data/test_data.parquet')
+
+# Train/test split
+target = ['default']
+tamanho_treino = 0.8
+treino_x, teste_x, treino_y, teste_y = train_test_split(train_data, test_data, train_size=tamanho_treino, random_state=1)
+del train_data, test_data  # libera memória
 
 
-emprestimos['issue_d']
+######## Modelo XGBoost - score 0.77751 (r2 0.236624, cv 0.821657)
+# Model parameters
+nome_modelo = datetime.datetime.now().strftime("%Y%m%d-%H%M")  # I like to record the inicial time for the model's name at the end
+classif_xgb = xgb.XGBClassifier(booster = "gbtree", # gbtree, dart
+                                tree_method = "approx", # hist, approx
+                                n_estimators = 1000,
+                                early_stopping_rounds = 300,
+                                device="cuda",
+                                nthread = 12,
+                                eta = 0.01, #learning rate (0.0-1.0)
+                                max_depth = 3, # default 1
+                                max_leaves = 5,
+                                objective = 'binary:logistic', # binary:logistic (returns probability), binary:logitraw (retorns score befor log transform), binary:hinge is default
+                                eval_metric = 'error', # used in binary classification
+                                seed = 1)
 
-######## Modelo XGBoost
+# Model fitting
+classif_xgb.fit(treino_x, treino_y,
+            eval_set = [(treino_x, treino_y), (teste_x, teste_y)],
+            verbose = 100)
+
+
+# Model cross-validation (assessing the model's robustness)
+cv_scores_xgb_treino = cross_val_score(classif_xgb, treino_x, y = treino_y,
+                                       n_jobs = 12,
+                                       verbose = 0,
+                                       params = {'eval_set':[(treino_x, treino_y), (teste_x, teste_y)], 'verbose':0}, 
+                                       error_score = 'raise')
+
+# Assessment of the prediction
+ypred_xgb = classif_xgb.predict(teste_x)
+score_xgb_r2 = r2_score(teste_y, ypred_xgb)
+print(f'\nCoefficient of Determination (R2): {score_xgb_r2:.6f}')
+print(f'Cross-validation score: {cv_scores_xgb_treino.mean():.6f}')
+
+# Generating a confusion matrix
+conf_matrix = metrics.confusion_matrix(teste_y.Survived.values.astype('int'), ypred_xgb, labels=[1, 0])
+plt.figure(figsize=(6, 6))
+sns.heatmap(conf_matrix,
+            annot = True,
+            cmap = 'Oranges',
+            xticklabels = ['Survived', 'Perished'],
+            yticklabels = ['Survived', 'Perished'])
+plt.title(f'Confusion Matrix - Model XGBoost {nome_modelo}', fontsize=12)
+plt.xlabel('Test data', fontsize=12)
+plt.ylabel('Predicted data', fontsize=12)
+plt.show()
