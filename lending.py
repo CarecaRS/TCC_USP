@@ -1,4 +1,9 @@
 # REFERÊNCIA: FAZER UM MODELO DE CADA ALGORITIMO ESTILO NAIVE - SÓ DROPA TODOS NANS DO DATASET INICIAL. 
+#
+# Testa os outros algoritmos para ver se tem problema de memória tb, se isso se mantiver tenta google colab ou algo nesse sentido (o problema estava em rodar via GPU, se rodar por CPU demora mas vai tranquilo)
+#
+# Tem um porém enorme no banco de dados: manter em mente que a possibilidade do default do cliente deve ser calculada antes dele obter o empréstimo, então colunas como 'last_pymt_XYZ' tem que ser desconsideradas.
+#
 # No naive dropa 'title' e fica apenas com 'purpose'
 #
 import pandas as pd
@@ -14,7 +19,7 @@ from sklearn.metrics import r2_score, log_loss
 import xgboost as xgb
 from catboost import CatBoostClassifier
 from lightgbm import LGBMClassifier
-#from sklearn import metrics
+from sklearn import metrics
 pd.set_option('display.max_rows', 250)
 pd.set_option('display.max_columns', None)
 np.set_printoptions(suppress=True, precision=4)
@@ -970,7 +975,7 @@ effr['mes_ano'] = pd.to_datetime(effr['mes_ano'], format='%b-%Y')
 emprestimos = pd.merge(right=emprestimos, left=effr, right_on='issue_d', left_on='mes_ano')
 #!
 # Dropa festures que já cumpriram seu propósito
-dropar = ['mes_ano', 'issue_d' ]
+dropar = ['mes_ano', 'issue_d', 'hardship_status', 'loan_status']
 emprestimos.drop(dropar, axis=1, inplace=True)
 emprestimos.to_parquet('data/emprestimos_pre_ohe.parquet')
 #!
@@ -979,7 +984,10 @@ emprestimos.to_parquet('data/emprestimos_pre_ohe.parquet')
 emprestimos = pd.read_parquet('data/emprestimos_pre_ohe.parquet')
 objetos = emprestimos.dtypes[emprestimos.dtypes == 'object'].index.to_list()
 #!
-"""
+
+emprestimos.drop('earliest_cr_line', axis=1, inplace=True)
+
+
 ohe = OneHotEncoder(drop='first',
                     sparse_output=False).set_output(transform='pandas')
 #!
@@ -992,7 +1000,7 @@ emprestimos_ohe2 = ohe.fit_transform(emprestimos[objetos[11:18]])
 #!
 emprestimos_ohe = pd.concat([emprestimos_ohe1, emprestimos_ohe2], axis=1)
 emprestimos_ohe.to_parquet('data/emprestimos_ohe.parquet')
-"""
+
 #!
 emprestimos_ohe = pd.read_parquet('data/emprestimos_ohe.parquet')  # carrega as features OHE
 emprestimos = emprestimos.drop(objetos, axis=1)  # dropa as colunas já utilizadas para OHE
@@ -1042,6 +1050,7 @@ train_data.to_parquet('data/train_data.parquet')
 
 #!
 # Com os dados salvos, carrega-se apenas os datasets já ajustados
+validacao = pd.read_parquet('data/validacao.parquet')
 train_data = pd.read_parquet('data/train_data.parquet')
 test_data = pd.read_parquet('data/test_data.parquet')
 
@@ -1049,17 +1058,20 @@ test_data = pd.read_parquet('data/test_data.parquet')
 target = ['default']
 tamanho_treino = 0.8
 treino_x, teste_x, treino_y, teste_y = train_test_split(train_data, test_data, train_size=tamanho_treino, random_state=1)
-del train_data, test_data  # libera memória
+valid_y = validacao[target]
+valid_x = validacao.drop(target, axis=1)
+del train_data, test_data, validacao  # libera memória
 
+train_data.columns.to_list()
 
-######## Modelo XGBoost - score 0.77751 (r2 0.236624, cv 0.821657)
-# Model parameters
+######## Modelo XGBoost - R2 0.999212 teste, cv 0.821657
+# Parâmetros do modelo
 nome_modelo = datetime.datetime.now().strftime("%Y%m%d-%H%M")  # I like to record the inicial time for the model's name at the end
 classif_xgb = xgb.XGBClassifier(booster = "gbtree", # gbtree, dart
                                 tree_method = "approx", # hist, approx
                                 n_estimators = 1000,
                                 early_stopping_rounds = 300,
-                                device="cuda",
+#                                device="cuda",
                                 nthread = 12,
                                 eta = 0.01, #learning rate (0.0-1.0)
                                 max_depth = 3, # default 1
@@ -1081,21 +1093,193 @@ cv_scores_xgb_treino = cross_val_score(classif_xgb, treino_x, y = treino_y,
                                        params = {'eval_set':[(treino_x, treino_y), (teste_x, teste_y)], 'verbose':0}, 
                                        error_score = 'raise')
 
-# Assessment of the prediction
+# Análise da previsão, dados de teste
 ypred_xgb = classif_xgb.predict(teste_x)
 score_xgb_r2 = r2_score(teste_y, ypred_xgb)
-print(f'\nCoefficient of Determination (R2): {score_xgb_r2:.6f}')
+print(f'\nCoeficiente de Determinação (R2, dados teste): {score_xgb_r2:.6f}')
 print(f'Cross-validation score: {cv_scores_xgb_treino.mean():.6f}')
 
-# Generating a confusion matrix
-conf_matrix = metrics.confusion_matrix(teste_y.Survived.values.astype('int'), ypred_xgb, labels=[1, 0])
+
+# Análise da previsão, dados de validação
+yvalid_xgb = classif_xgb.predict(valid_x)
+score_xgb_r2_v = r2_score(valid_y, yvalid_xgb)
+print(f'\nCoeficiente de Determinação (R2, dados validação): {score_xgb_r2_v:.6f}')
+
+
+# Matriz de confusão (dados de validação)
+conf_matrix = metrics.confusion_matrix(valid_y.default.values.astype('int'), yvalid_xgb, labels=[1, 0])
+plt.figure(figsize=(6, 6))
+sns.heatmap(conf_matrix,
+            annot = True,
+            cmap = 'Oranges',
+            xticklabels = ['Inadimpliente', 'Em dia'],
+            yticklabels = ['Inadimplente', 'Em dia'])
+plt.title(f'Matriz de Confusão - Modelo XGBoost {nome_modelo}', fontsize=12)
+plt.xlabel('Dados de validação', fontsize=12)
+plt.ylabel('Dados previstos', fontsize=12)
+plt.show()
+
+
+
+#### TEST MODEL 2 - CatBoost (CatBoostClassifier) - score 0.79904 (r2 0.144094, cv 0.828660)
+# Model parameters
+nome_modelo = datetime.now().strftime("%Y%m%d-%H%M")  # I like to record the inicial time for the model's name at the end
+classif_cat = CatBoostClassifier(loss_function='Logloss', # https://catboost.ai/en/docs/concepts/loss-functions-classification#usage-information
+                                 eval_metric = 'Logloss', # Logloss, AUC, MAPE, Poisson, Precision, Accuracy, R2, MedianAbsoluteError, PairAccuracy, PrecisionAt https://catboost.ai/en/docs/references/custom-metric__supported-metrics
+                                 iterations = 1000,
+                                 learning_rate = 0.01,
+                                 random_seed = 1,
+                                 bootstrap_type = 'MVS', #Bayesian (log), Bernoulli (stochastic), MVS (variance), Poisson (Poisson distribution)
+                                 bagging_temperature = 7, 
+                                 depth = 10,
+                                 early_stopping_rounds = 500,
+                                 thread_count = 12,
+                                 task_type = 'CPU', 
+                                 gpu_ram_part = 0.2,
+                                 target_border = 0.5, 
+                                 grow_policy = 'Lossguide', # Lossguide, Depthwise, SymmetricTree
+                                 min_child_samples = 15, # default 1
+                                 max_leaves = 20, # default 31
+                                 boosting_type = 'Plain', # https://catboost.ai/en/docs/references/training-parameters/common#boosting_type
+                                 score_function = 'L2' # L2, NewtonL2
+                                 )
+
+# Model fitting
+classif_cat.fit(treino_x, treino_y,
+            eval_set = (teste_x, teste_y),
+            verbose = 100)
+
+# Model cross-validation (assessing the model's robustness)
+cv_scores_cat = cross_val_score(classif_cat, treino_x, y = treino_y,
+                                       cv = 7, # None: default 5-fold cross validation
+                                       n_jobs = 12,
+                                       verbose = 0,
+                                       params = {'eval_set':(teste_x, teste_y), 'verbose':0}, 
+                                       error_score = 'raise')
+
+# Assessment of the prediction
+ypred_cat = classif_cat.predict(teste_x)
+score_cat_r2 = r2_score(teste_y, ypred_cat)
+print(f'\nCoefficient of Determination (R2): {score_cat_r2:.6f}')
+print(f'Cross-validation score: {cv_scores_cat.mean():.6f}')
+
+
+# Confusion Matrix
+conf_matrix = metrics.confusion_matrix(teste_y.Survived.values.astype('int'), ypred_cat, labels=[1, 0])
 plt.figure(figsize=(6, 6))
 sns.heatmap(conf_matrix,
             annot = True,
             cmap = 'Oranges',
             xticklabels = ['Survived', 'Perished'],
             yticklabels = ['Survived', 'Perished'])
-plt.title(f'Confusion Matrix - Model XGBoost {nome_modelo}', fontsize=12)
+plt.title(f'Confusion Matrix - model CatBoost {nome_modelo}', fontsize=12)
 plt.xlabel('Test data', fontsize=12)
 plt.ylabel('Predicted data', fontsize=12)
 plt.show()
+
+
+
+
+#### TEST MODEL 3 - LightGBMt (LGBMClassifier) - score 0.78468 (r2 0.028431, cv 0.839978)
+# Model parameters
+nome_modelo = datetime.now().strftime("%Y%m%d-%H%M")  # I like to record the inicial time for the model's name at the end, as you already now it.
+classif_lgbm = LGBMClassifier(boosting_type = 'gbdt', # 'gbdt' default, 'rf'
+                              num_leaves = 16, # default 31
+                              max_depth = 3,
+                              learning_rate = 0.01,
+                              n_estimators = 800, # default 100
+                              objective = 'binary',
+                              min_split_gain=0.02, 
+                              min_child_weight=0.022,
+                              min_child_samples=20, # default
+                              subsample=0.6, # default 1
+                              random_state=1,
+                              n_jobs=12,
+                              importance_type='split',
+                              metric = 'binary_logloss' # 'map', 'auc', 'average_precision', 'binary_logloss', 'binary_error, 'auc_mu', 'logloss'
+                              )
+
+# Model fitting
+classif_lgbm.fit(treino_x, treino_y,
+            eval_set = (teste_x, teste_y))
+
+# Model cross-validation (assessing the model's robustness)
+cv_scores_lgbm = cross_val_score(classif_lgbm, treino_x, y = treino_y,
+                                       cv = 5, # None: default 5-fold cross validation
+                                       n_jobs = 12,
+                                       verbose = 0,
+                                       params = {'eval_set':(teste_x, teste_y)}, 
+                                       error_score = 'raise')
+
+# Assessment of the prediction
+ypred_lgbm = classif_lgbm.predict(teste_x)
+score_lgbm_r2 = r2_score(teste_y, ypred_lgbm)
+print(f'\nCoeficiente de determinação: {score_lgbm_r2:.6f}')
+print(f'Score de validação cruzada: {cv_scores_lgbm.mean():.6f}')
+
+
+# Confusion Matrix
+conf_matrix = metrics.confusion_matrix(teste_y.Survived.values.astype('int'), ypred_lgbm, labels=[1, 0])
+plt.figure(figsize=(6, 6))
+sns.heatmap(conf_matrix,
+            annot = True,
+            cmap = 'Oranges',
+            xticklabels = ['Survived', 'Perished'],
+            yticklabels = ['Survived', 'Perished'])
+plt.title(f'Confusion Matrix - model LightGBM {nome_modelo}', fontsize=12)
+plt.xlabel('Test data', fontsize=12)
+plt.ylabel('Predicted data', fontsize=12)
+plt.show()
+
+
+
+#### TEST MODEL 4 - Random Forest (RandomForestClassifier) - score 0.79186 (r2 0.144094, cv 0.841367)
+# Model parameters
+nome_modelo = datetime.now().strftime("%Y%m%d-%H%M")  # Again.
+classif_skl_rf = RandomForestClassifier(n_estimators = 1600,
+                                        criterion = 'entropy', # 'gini' default, 'entropy', 'log_loss'
+                                        max_depth = 21, # default None
+                                        min_samples_split = 6, # default 2
+                                        min_samples_leaf = 1, # default 1
+                                        max_features='sqrt', # 'sqrt' default, 'log2, None
+                                        bootstrap = True, # se 'False' usa o dataset inteiro para montar cada árvore
+                                        oob_score = False, # Utilizado se bootstrep = True, usa uma métrica para o score geral (algo tipo r2score(y_true, y_pred))
+                                        max_samples = 0.4, # usa com bootstrap = True, percentual de utilização amostral de X para treinar cada estimamdor
+                                        n_jobs = 12,
+                                        random_state = 1,
+                                        verbose = 2,
+                                        warm_start = False, # default, se True reutiliza a solução do último fit e adiciona mais estimadores ao agrupado
+                                        )
+
+# Model fitting
+classif_skl_rf.fit(treino_x, treino_y)
+
+# Model cross-validation (assessing the model's robustness)
+cv_scores_skl_rf = cross_val_score(classif_skl_rf, treino_x, y = treino_y, # estimador (usado no fit), X, y (se existente)
+                                       cv = 5, # None: default 5-fold cross validation
+                                       n_jobs = 12,
+                                       verbose = 0,
+                                       error_score = 'raise')
+
+# Assessment of the prediction
+ypred_skl_rf = classif_skl_rf.predict(teste_x)
+score_skl_rf = r2_score(teste_y, ypred_skl_rf)
+print(f'\nCoeficiente de determinação: {score_skl_rf:.6f}')
+print(f'Score de validação cruzada: {cv_scores_skl_rf.mean():.6f}')
+
+
+# Confusion Matrix
+conf_matrix = metrics.confusion_matrix(teste_y.Survived.values.astype('int'), ypred_skl_rf, labels=[1, 0])
+plt.figure(figsize=(6, 6))
+sns.heatmap(conf_matrix,
+            annot = True,
+            cmap = 'Oranges',
+            xticklabels = ['Survived', 'Perished'],
+            yticklabels = ['Survived', 'Perished'])
+plt.title(f'Confusion Matrix - model Random Forest (sklearn) {nome_modelo}', fontsize=12)
+plt.xlabel('Test data', fontsize=12)
+plt.ylabel('Predicted data', fontsize=12)
+plt.show()
+
+
+
