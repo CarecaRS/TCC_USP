@@ -15,11 +15,11 @@ import datetime
 import dateutil.relativedelta
 from sklearn.preprocessing import OneHotEncoder
 from sklearn.model_selection import cross_val_score, train_test_split
-from sklearn.metrics import r2_score, log_loss
+from sklearn.metrics import r2_score, roc_auc_score, accuracy_score
 from sklearn.ensemble import RandomForestClassifier
-import xgboost as xgb
+#import xgboost as xgb
 from catboost import CatBoostClassifier
-from lightgbm import LGBMClassifier
+#from lightgbm import LGBMClassifier
 from sklearn import metrics
 pd.set_option('display.max_rows', 250)
 pd.set_option('display.max_columns', None)
@@ -1062,64 +1062,7 @@ valid_x = validacao.drop(target, axis=1)
 del train_data, test_data, validacao  # libera memória
 
 
-######## Modelo XGBoost - R2 0.960005 teste, R2 0.959 validacação
-# Parâmetros do modelo
-nome_modelo = datetime.datetime.now().strftime("%Y%m%d-%H%M")  # I like to record the inicial time for the model's name at the end
-classif_xgb = xgb.XGBClassifier(booster = "gbtree", # gbtree, dart
-                                tree_method = "approx", # hist, approx
-                                n_estimators = 1000,
-                                early_stopping_rounds = 300,
-#                                device="cuda",
-                                nthread = 12,
-                                eta = 0.01, #learning rate (0.0-1.0)
-                                max_depth = 3, # default 1
-                                max_leaves = 5,
-                                objective = 'binary:logistic', # binary:logistic (returns probability), binary:logitraw (retorns score befor log transform), binary:hinge is default
-                                eval_metric = 'error', # used in binary classification
-                                seed = 1)
-
-# Model fitting
-classif_xgb.fit(treino_x, treino_y,
-            eval_set = [(treino_x, treino_y), (teste_x, teste_y)],
-            verbose = 100)
-
-
-# Model cross-validation (assessing the model's robustness)
-cv_scores_xgb_treino = cross_val_score(classif_xgb, treino_x, y = treino_y,
-                                       n_jobs = 12,
-                                       verbose = 0,
-                                       params = {'eval_set':[(treino_x, treino_y), (teste_x, teste_y)], 'verbose':0}, 
-                                       error_score = 'raise')
-
-# Análise da previsão, dados de teste
-ypred_xgb = classif_xgb.predict(teste_x)
-score_xgb_r2 = r2_score(teste_y, ypred_xgb)
-print(f'\nCoeficiente de Determinação (R2, dados teste): {score_xgb_r2:.6f}')
-#print(f'Cross-validation score: {cv_scores_xgb_treino.mean():.6f}')
-
-
-# Análise da previsão, dados de validação
-yvalid_xgb = classif_xgb.predict(valid_x)
-score_xgb_r2_v = r2_score(valid_y, yvalid_xgb)
-print(f'\nCoeficiente de Determinação (R2, dados validação): {score_xgb_r2_v:.6f}')
-
-
-# Matriz de confusão (dados de validação)
-conf_matrix = metrics.confusion_matrix(valid_y.default.values.astype('int'), ypred_xgb, labels=[1, 0])
-plt.figure(figsize=(6, 6))
-sns.heatmap(conf_matrix,
-            annot = True,
-            cmap = 'Oranges',
-            xticklabels = ['Inadimpliente', 'Em dia'],
-            yticklabels = ['Inadimplente', 'Em dia'])
-plt.title(f'Matriz de Confusão - Modelo XGBoost {nome_modelo}', fontsize=12)
-plt.xlabel('Dados de teste', fontsize=12)
-plt.ylabel('Dados previstos', fontsize=12)
-plt.show()
-
-
-
-#### TEST MODEL 2 - CatBoost (CatBoostClassifier) - R2 0.990142 teste, R2 validação 0.990845
+#### MODELO 1. BOOSTING - CatBoost (CatBoostClassifier) - R2 0.990142 teste, CV score 0.998875, R2 validação 0.990845
 # Model parameters
 nome_modelo = datetime.datetime.now().strftime("%Y%m%d-%H%M")  # I like to record the inicial time for the model's name at the end
 classif_cat = CatBoostClassifier(loss_function='Logloss', # https://catboost.ai/en/docs/concepts/loss-functions-classification#usage-information
@@ -1147,100 +1090,56 @@ classif_cat.fit(treino_x, treino_y,
             eval_set = (teste_x, teste_y),
             verbose = 100)
 
-# Model cross-validation (assessing the model's robustness)
-#cv_scores_cat = cross_val_score(classif_cat, treino_x, y = treino_y,
-#                                       cv = 7, # None: default 5-fold cross validation
-#                                       n_jobs = 12,
-#                                       verbose = 0,
-#                                       params = {'eval_set':(teste_x, teste_y), 'verbose':0}, 
-#                                       error_score = 'raise')
+# Cálculo de validação cruzada (avalia a robustez do modelo)
+cv_scores_cat = cross_val_score(classif_cat, treino_x, y = treino_y,
+                                       verbose = 0,
+                                       params = {'eval_set':(teste_x, teste_y), 'verbose':100}, 
+                                       error_score = 'raise')
 
-# Análise da previsão, dados de teste
-ypred_cat = classif_cat.predict(teste_x)
-score_cat_r2 = r2_score(teste_y, ypred_cat)
-print(f'\nCoeficiente de Determinação (R2, dados teste): {score_cat_r2:.6f}')
+## Análise da previsão
+# Cálculo das métricas com os dados de teste
+ypred_cat = classif_cat.predict(teste_x)  # previsão dos dados de teste
+score_cat_r2 = r2_score(teste_y, ypred_cat)  # cálculo de coeficiente de determinação (R2)
+roc_auc_cat = roc_auc_score(teste_y, ypred_cat)  # cálculo ROC-AUC
+acc_cat = accuracy_score(teste_y, ypred_cat)  # cálculo accuracy
 #!
-# Análise da previsão, dados de validação
-yvalid_cat = classif_cat.predict(valid_x)
-score_cat_r2_v = r2_score(valid_y, yvalid_cat)
-print(f'\nCoeficiente de Determinação (R2, dados validação): {score_cat_r2_v:.6f}')
+# Cálculo das métricas com os dados de validação
+yvalid_cat = classif_cat.predict(valid_x)  # previsão dos dados de validação
+score_cat_r2v = r2_score(valid_y, yvalid_cat)  # cálculo do coeficiente de determinação (R2)
+roc_auc_catv = roc_auc_score(valid_y, yvalid_cat)  # cálculo ROC-AUC
+acc_catv = accuracy_score(valid_y, yvalid_cat)  # cálculo accuracy
+#!
+print(f'Análises do Modelo CatBoost {nome_modelo}\n')
+print(f'Score de cross-validation: {cv_scores_cat.mean():.6f}\n')
+print('Análise do modelo com os dados de TESTE')
+print(f'Coeficiente de Determinação (R2): {score_cat_r2:.6f}')
+print(f'Valor métrica ROC-AUC: {roc_auc_cat:.6f}')
+print(f'Valor de Accuracy: {acc_cat:.6f}')
+#!
+print('\nAnálise do modelo com dados de VALIDAÇÃO')
+print(f'\nCoeficiente de Determinação (R2): {score_cat_r2_v:.6f}')
+print(f'Valor métrica ROC-AUC: {roc_auc_catv:.6f}')
+print(f'Valor de Accuracy: {acc_catv:.6f}')
 
-# Confusion Matrix
+# Matriz de confusão
 conf_matrix = metrics.confusion_matrix(teste_y.default.values.astype('int'), ypred_cat, labels=[1, 0])
-plt.figure(figsize=(6, 6))
+plt.figure(figsize=(18, 18))
 sns.heatmap(conf_matrix,
-            annot = True,
-            cmap = 'Oranges',
-            xticklabels = ['Inadimplentes', 'Em dia'],
-            yticklabels = ['Inadimplentes', 'Em dia'])
+            fmt='d',
+            annot=True,
+            cmap='Oranges',
+            xticklabels=['Inadimplentes', 'Em dia'],
+            yticklabels=['Inadimplentes', 'Em dia'])
 plt.title(f'Matriz de Confusão - modelo CatBoost {nome_modelo}', fontsize=12)
 plt.xlabel('Dados de teste', fontsize=12)
 plt.ylabel('Dados previstos', fontsize=12)
 plt.show()
 
 
-
-
-#### TEST MODEL 3 - LightGBMt (LGBMClassifier) - R2 0.968805 teste, R2 validação 0.968543
-# Model parameters
-nome_modelo = datetime.datetime.now().strftime("%Y%m%d-%H%M")  # I like to record the inicial time for the model's name at the end, as you already now it.
-classif_lgbm = LGBMClassifier(boosting_type = 'gbdt', # 'gbdt' default, 'rf'
-                              num_leaves = 16, # default 31
-                              max_depth = 3,
-                              learning_rate = 0.01,
-                              n_estimators = 800, # default 100
-                              objective = 'binary',
-                              min_split_gain=0.02, 
-                              min_child_weight=0.022,
-                              min_child_samples=20, # default
-                              subsample=0.6, # default 1
-                              random_state=1,
-                              n_jobs=12,
-                              importance_type='split',
-                              metric = 'binary_logloss' # 'map', 'auc', 'average_precision', 'binary_logloss', 'binary_error, 'auc_mu', 'logloss'
-                              )
-
-# Model fitting
-classif_lgbm.fit(treino_x, treino_y,
-            eval_set = (teste_x, teste_y))
-
-# Model cross-validation (assessing the model's robustness)
-#cv_scores_lgbm = cross_val_score(classif_lgbm, treino_x, y = treino_y,
-#                                       cv = 5, # None: default 5-fold cross validation
-#                                       n_jobs = 12,
-#                                       verbose = 0,
-#                                       params = {'eval_set':(teste_x, teste_y)}, 
-#                                       error_score = 'raise')
-
-# Análise da previsão, dados de teste
-ypred_lgbm = classif_lgbm.predict(teste_x)
-score_lgbm_r2 = r2_score(teste_y, ypred_lgbm)
-print(f'\nCoeficiente de Determinação (R2, dados teste): {score_lgbm_r2:.6f}')
-#!
-# Análise da previsão, dados de validação
-yvalid_lgbm = classif_lgbm.predict(valid_x)
-score_lgbm_r2_v = r2_score(valid_y, yvalid_lgbm)
-print(f'\nCoeficiente de Determinação (R2, dados validação): {score_lgbm_r2_v:.6f}')
-
-# Confusion Matrix
-conf_matrix = metrics.confusion_matrix(teste_y.default.values.astype('int'), ypred_lgbm, labels=[1, 0])
-plt.figure(figsize=(6, 6))
-sns.heatmap(conf_matrix,
-            annot = True,
-            cmap = 'Oranges',
-            xticklabels = ['Inadimplente', 'Em dia'],
-            yticklabels = ['Inadimplente', 'Em dia'])
-plt.title(f'Matriz de confusão - modelo LightGBM {nome_modelo}', fontsize=12)
-plt.xlabel('Dados de teste', fontsize=12)
-plt.ylabel('Dados previstos', fontsize=12)
-plt.show()
-
-
-
-#### TEST MODEL 4 - Random Forest (RandomForestClassifier) - R2 0.981004 teste, R2 validação 0.981563
+#### MODELO 2. RANDOM FOREST - RandomForestClassifier - R2 0.981004 teste, CV 0.997701, R2 validação 0.981563
 # Model parameters
 nome_modelo = datetime.datetime.now().strftime("%Y%m%d-%H%M")  # Again.
-classif_skl_rf = RandomForestClassifier(n_estimators = 1600,
+classif_skl_rf = RandomForestClassifier(n_estimators = 1000,
                                         criterion = 'entropy', # 'gini' default, 'entropy', 'log_loss'
                                         max_depth = 21, # default None
                                         min_samples_split = 6, # default 2
@@ -1259,31 +1158,138 @@ classif_skl_rf = RandomForestClassifier(n_estimators = 1600,
 classif_skl_rf.fit(treino_x, treino_y)
 
 # Model cross-validation (assessing the model's robustness)
-#cv_scores_skl_rf = cross_val_score(classif_skl_rf, treino_x, y = treino_y, # estimador (usado no fit), X, y (se existente)
-#                                       cv = 5, # None: default 5-fold cross validation
-#                                       n_jobs = 12,
-#                                       verbose = 0,
-#                                       error_score = 'raise')
+cv_scores_skl_rf = cross_val_score(classif_skl_rf, treino_x, y = treino_y, # estimador (usado no fit), X, y (se existente)
+                                       verbose = 100,
+                                       error_score = 'raise')
 
-# Análise da previsão, dados de teste
-ypred_skl_rf = classif_skl_rf.predict(teste_x)
-score_skl_rf_r2 = r2_score(teste_y, ypred_skl_rf)
-print(f'\nCoeficiente de Determinação (R2, dados teste): {score_skl_rf_r2:.6f}')
+## Análise da previsão
+# Cálculo das métricas com os dados de teste
+ypred_skl_rf = classif_skl_rf.predict(teste_x)  # previsão dos dados de teste
+score_skl_rf_r2 = r2_score(teste_y, ypred_skl_rf)  # cálculo de coeficiente de determinação (R2)
+roc_auc_skl_rf = roc_auc_score(teste_y, ypred_skl_rf)  # cálculo ROC-AUC
+acc_skl_rf = accuracy_score(teste_y, ypred_skl_rf)  # cálculo accuracy
 #!
-# Análise da previsão, dados de validação
-yvalid_skl_rf = classif_skl_rf.predict(valid_x)
-score_skl_rf_r2_v = r2_score(valid_y, yvalid_skl_rf)
-print(f'\nCoeficiente de Determinação (R2, dados validação): {score_skl_rf_r2_v:.6f}')
+# Cálculo das métricas com os dados de validação
+yvalid_skl_rf = classif_skl_rf.predict(valid_x)  # previsão dos dados de validação
+score_skl_rf_r2v = r2_score(valid_y, yvalid_skl_rf)  # cálculo do coeficiente de determinação (R2)
+roc_auc_skl_rfv = roc_auc_score(valid_y, yvalid_skl_rf)  # cálculo ROC-AUC
+acc_skl_rfv = accuracy_score(valid_y, yvalid_skl_rf)  # cálculo accuracy
+#!
+print(f'Análises do Modelo CatBoost {nome_modelo}\n')
+print(f'Score de cross-validation: {cv_scores_skl_rf.mean():.6f}\n')
+print('Análise do modelo com os dados de TESTE')
+print(f'Coeficiente de Determinação (R2): {score_skl_rf_r2:.6f}')
+print(f'Valor métrica ROC-AUC: {roc_auc_skl_rf:.6f}')
+print(f'Valor de Accuracy: {acc_skl_rf:.6f}')
+#!
+print('\nAnálise do modelo com dados de VALIDAÇÃO')
+print(f'\nCoeficiente de Determinação (R2): {score_skl_rf_r2_v:.6f}')
+print(f'Valor métrica ROC-AUC: {roc_auc_skl_rfv:.6f}')
+print(f'Valor de Accuracy: {acc_skl_rfv:.6f}')
 
-# Confusion Matrix
+# Matriz de confusão
 conf_matrix = metrics.confusion_matrix(teste_y.default.values.astype('int'), ypred_skl_rf, labels=[1, 0])
 plt.figure(figsize=(6, 6))
 sns.heatmap(conf_matrix,
-            annot = True,
-            cmap = 'Oranges',
-            xticklabels = ['Inadimplente', 'Em dia'],
-            yticklabels = ['Inadimplente', 'Em dia'])
-plt.title(f'Matriz de confusão - modelo LightGBM {nome_modelo}', fontsize=12)
+            fmt='d',
+            annot=True,
+            cmap='Oranges',
+            xticklabels=['Inadimplente', 'Em dia'],
+            yticklabels=['Inadimplente', 'Em dia'])
+plt.title(f'Matriz de confusão - modelo Random Forest {nome_modelo}', fontsize=12)
 plt.xlabel('Dados de teste', fontsize=12)
 plt.ylabel('Dados previstos', fontsize=12)
 plt.show()
+
+
+#### MODELO SVM - XXXXXXXXXXX - R2 0.XXXXXX teste, CV 0.XXXXXX, R2 validação 0.XXXXXX
+# Model parameters
+nome_modelo = datetime.datetime.now().strftime("%Y%m%d-%H%M")  # Again.
+
+
+## Análise da previsão
+# Cálculo das métricas com os dados de teste
+ypred_svm = classif_svm.predict(teste_x)  # previsão dos dados de teste
+score_svm_r2 = r2_score(teste_y, ypred_svm)  # cálculo de coeficiente de determinação (R2)
+roc_auc_svm = roc_auc_score(teste_y, ypred_svm)  # cálculo ROC-AUC
+acc_svm = accuracy_score(teste_y, ypred_svm)  # cálculo accuracy
+#!
+# Cálculo das métricas com os dados de validação
+yvalid_svm = classif_svm.predict(valid_x)  # previsão dos dados de validação
+score_svm_r2v = r2_score(valid_y, yvalid_svm)  # cálculo do coeficiente de determinação (R2)
+roc_auc_svmv = roc_auc_score(valid_y, yvalid_svm)  # cálculo ROC-AUC
+acc_svmv = accuracy_score(valid_y, yvalid_svm)  # cálculo accuracy
+#!
+print(f'Análises do Modelo CatBoost {nome_modelo}\n')
+print(f'Score de cross-validation: {cv_scores_svm.mean():.6f}\n')
+print('Análise do modelo com os dados de TESTE')
+print(f'Coeficiente de Determinação (R2): {score_svm_r2:.6f}')
+print(f'Valor métrica ROC-AUC: {roc_auc_svm:.6f}')
+print(f'Valor de Accuracy: {acc_svm:.6f}')
+#!
+print('\nAnálise do modelo com dados de VALIDAÇÃO')
+print(f'\nCoeficiente de Determinação (R2): {score_svm_r2_v:.6f}')
+print(f'Valor métrica ROC-AUC: {roc_auc_svmv:.6f}')
+print(f'Valor de Accuracy: {acc_svmv:.6f}')
+
+
+#### MODELO NEURAL - XXXXXXXXXXX - R2 0.XXXXXX teste, CV 0.XXXXXX, R2 validação 0.XXXXXX
+# Model parameters
+nome_modelo = datetime.datetime.now().strftime("%Y%m%d-%H%M")  # Again.
+
+
+
+
+## Análise da previsão
+# Cálculo das métricas com os dados de teste
+ypred_nn = classif_nn.predict(teste_x)  # previsão dos dados de teste
+score_nn_r2 = r2_score(teste_y, ypred_nn)  # cálculo de coeficiente de determinação (R2)
+roc_auc_nn = roc_auc_score(teste_y, ypred_nn)  # cálculo ROC-AUC
+acc_nn = accuracy_score(teste_y, ypred_nn)  # cálculo accuracy
+#!
+# Cálculo das métricas com os dados de validação
+yvalid_nn = classif_nn.predict(valid_x)  # previsão dos dados de validação
+score_nn_r2v = r2_score(valid_y, yvalid_nn)  # cálculo do coeficiente de determinação (R2)
+roc_auc_nnv = roc_auc_score(valid_y, yvalid_nn)  # cálculo ROC-AUC
+acc_nnv = accuracy_score(valid_y, yvalid_nn)  # cálculo accuracy
+#!
+print(f'Análises do Modelo CatBoost {nome_modelo}\n')
+print(f'Score de cross-validation: {cv_scores_nn.mean():.6f}\n')
+print('Análise do modelo com os dados de TESTE')
+print(f'Coeficiente de Determinação (R2): {score_nn_r2:.6f}')
+print(f'Valor métrica ROC-AUC: {roc_auc_nn:.6f}')
+print(f'Valor de Accuracy: {acc_nn:.6f}')
+#!
+print('\nAnálise do modelo com dados de VALIDAÇÃO')
+print(f'\nCoeficiente de Determinação (R2): {score_nn_r2_v:.6f}')
+print(f'Valor métrica ROC-AUC: {roc_auc_nnv:.6f}')
+print(f'Valor de Accuracy: {acc_nnv:.6f}')
+
+
+#### MODELO LDA - LINEAR DISCRIMINANT ANALYSIS - R2 0.XXXXXX teste, CV 0.XXXXXX, R2 validação 0.XXXXXX
+
+## Análise da previsão
+# Cálculo das métricas com os dados de teste
+ypred_lda = classif_lda.predict(teste_x)  # previsão dos dados de teste
+score_lda_r2 = r2_score(teste_y, ypred_lda)  # cálculo de coeficiente de determinação (R2)
+roc_auc_lda = roc_auc_score(teste_y, ypred_lda)  # cálculo ROC-AUC
+acc_lda = accuracy_score(teste_y, ypred_lda)  # cálculo accuracy
+#!
+# Cálculo das métricas com os dados de validação
+yvalid_lda = classif_lda.predict(valid_x)  # previsão dos dados de validação
+score_lda_r2v = r2_score(valid_y, yvalid_lda)  # cálculo do coeficiente de determinação (R2)
+roc_auc_ldav = roc_auc_score(valid_y, yvalid_lda)  # cálculo ROC-AUC
+acc_ldav = accuracy_score(valid_y, yvalid_lda)  # cálculo accuracy
+#!
+print(f'Análises do Modelo CatBoost {nome_modelo}\n')
+print(f'Score de cross-validation: {cv_scores_lda.mean():.6f}\n')
+print('Análise do modelo com os dados de TESTE')
+print(f'Coeficiente de Determinação (R2): {score_lda_r2:.6f}')
+print(f'Valor métrica ROC-AUC: {roc_auc_lda:.6f}')
+print(f'Valor de Accuracy: {acc_lda:.6f}')
+#!
+print('\nAnálise do modelo com dados de VALIDAÇÃO')
+print(f'\nCoeficiente de Determinação (R2): {score_lda_r2_v:.6f}')
+print(f'Valor métrica ROC-AUC: {roc_auc_ldav:.6f}')
+print(f'Valor de Accuracy: {acc_ldav:.6f}')
+
